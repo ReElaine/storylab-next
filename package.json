@@ -1,0 +1,26 @@
+{
+  "name": "storylab-next",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone experimental novel-writing architecture inspired by Inkos",
+  "type": "module",
+  "bin": {
+    "storylab-next": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "demo:init": "node dist/index.js init-demo ./demo-workspace",
+    "demo:run": "node dist/index.js run ./demo-workspace ember-fall 1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "openai": "^4.104.0"
+  }
+}

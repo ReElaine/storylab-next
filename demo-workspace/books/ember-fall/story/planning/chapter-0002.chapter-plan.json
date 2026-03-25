@@ -1,0 +1,42 @@
+{
+  "targetChapterNumber": 2,
+  "chapterMission": "推进 代价与亲密仍在推进，同时把上一章遗留的不安转化为更明确的行动。",
+  "readerGoal": "让读者同时获得推进感和更清晰的风险感，结尾留下必须继续读的悬念。",
+  "sceneBlueprint": [
+    {
+      "sceneNumber": 1,
+      "objective": "承接上一章余波，把角色放进新的短期目标里",
+      "tension": "角色必须决定隐瞒、求助还是抢先行动",
+      "reveal": "上一章获得的异常信号出现新的解释",
+      "endingBeat": "主角做出会放大代价的选择"
+    },
+    {
+      "sceneNumber": 2,
+      "objective": "把外部压力和人物关系压力叠加",
+      "tension": "盟友不再只提供信息，而开始要求立场",
+      "reveal": "暴露一个会改变人物判断的新事实",
+      "endingBeat": "关系发生轻微偏转"
+    },
+    {
+      "sceneNumber": 3,
+      "objective": "以更强钩子结束章节",
+      "tension": "代价从抽象威胁变成具体后果",
+      "reveal": "主题冲突被明确化",
+      "endingBeat": "留下一个新的不可回避问题"
+    }
+  ],
+  "characterIntent": [
+    {
+      "name": "林炽",
+      "desiredMovement": "林炽需要沿着“角色继续按照旧误判行动，但裂缝已经出现”继续被迫做选择",
+      "costPressure": "身体代价已经显性出现"
+    },
+    {
+      "name": "沈砚",
+      "desiredMovement": "沈砚需要沿着“角色继续按照旧误判行动，但裂缝已经出现”继续被迫做选择",
+      "costPressure": "身体代价已经显性出现"
+    }
+  ],
+  "themeIntent": "继续推进“代价与亲密”并压低“力量可以无损获得”的成立空间。",
+  "gateNote": "本章没有命中硬性人工检查点，但仍建议依据 revision brief 自查。"
+}

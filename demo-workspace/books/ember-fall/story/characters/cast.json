@@ -1,0 +1,30 @@
+[
+  {
+    "name": "林炽",
+    "role": "protagonist",
+    "baselineDesire": "证明自己配得上继承母亲留下的火种",
+    "baselineFear": "一旦失控就会伤到身边的人",
+    "baselineMisbelief": "只有独自承受代价才算真正强大",
+    "voiceNotes": "说话克制，遇到压力会省略主语，像在压住情绪",
+    "relationshipMap": [
+      {
+        "target": "沈砚",
+        "status": "互相试探的盟友"
+      }
+    ]
+  },
+  {
+    "name": "沈砚",
+    "role": "foil",
+    "baselineDesire": "找到失踪调查员留下的真相",
+    "baselineFear": "再次信错人",
+    "baselineMisbelief": "掌控信息就等于掌控局面",
+    "voiceNotes": "对白锋利，习惯追问，不轻易给完整答案",
+    "relationshipMap": [
+      {
+        "target": "林炽",
+        "status": "观察中的合作对象"
+      }
+    ]
+  }
+]

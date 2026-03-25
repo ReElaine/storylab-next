@@ -1,0 +1,7 @@
+{
+  "narrativeVoice": "近距离第三人称，压迫感强，少解释，多让动作和环境渗出情绪",
+  "dialogueRule": "对白必须区分人物策略，不允许所有角色说话一个腔调",
+  "sentenceRhythm": "短句推进冲突，中句承接信息，长句只用于情绪波峰前后",
+  "descriptionDensity": "动作场景低描写密度，情绪停顿时提高感官描写",
+  "paragraphStrategy": "一段只承担一个推进功能，避免平均长度段落"
+}

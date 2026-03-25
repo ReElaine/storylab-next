@@ -1,0 +1,11 @@
+{
+  "chapterNumber": 1,
+  "gate": {
+    "key": "opening",
+    "label": "开书确认",
+    "triggerChapter": 1,
+    "purpose": "确认卖点、主角欲望和世界入口足够清晰"
+  },
+  "required": true,
+  "rationale": "章节达到人工检查点：开书确认"
+}

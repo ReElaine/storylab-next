@@ -1,0 +1,26 @@
+[
+  {
+    "key": "opening",
+    "label": "开书确认",
+    "triggerChapter": 1,
+    "purpose": "确认卖点、主角欲望和世界入口足够清晰"
+  },
+  {
+    "key": "early-arc",
+    "label": "前三章检查",
+    "triggerChapter": 3,
+    "purpose": "确认钩子兑现速度、人物关系和主题方向"
+  },
+  {
+    "key": "midpoint",
+    "label": "中盘转折检查",
+    "triggerChapter": 30,
+    "purpose": "确认中盘转折前的筹码已经到位"
+  },
+  {
+    "key": "finale",
+    "label": "结尾收束检查",
+    "triggerChapter": 100,
+    "purpose": "确认主题兑现与结局收束"
+  }
+]
