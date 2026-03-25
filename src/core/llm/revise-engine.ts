@@ -1,4 +1,5 @@
 import type {
+  BlockingGateStatus,
   ChapterAnalysisBundle,
   ChapterDraft,
   ChapterPlan,
@@ -25,45 +26,61 @@ export interface ReviseEngine {
   revise(input: RevisionInput): Promise<ChapterDraft>;
 }
 
-function appendRevisionParagraphs(input: RevisionInput): string {
-  const additions: string[] = [];
+function splitScenes(content: string): ReadonlyArray<string> {
+  return content
+    .split(/(?=【场景\s*\d+\s*\/\s*POV[:：])/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
 
-  for (const issue of input.sceneAudit.issues.slice(0, 3)) {
-    additions.push(
-      `【修订补强场景 ${issue.sceneNumber}】${issue.problem}。${issue.recommendation}`,
-    );
+function buildSceneRevisionBlock(input: RevisionInput, sceneNumber: number): string {
+  const scene = input.plan.sceneBlueprint.find((entry) => entry.sceneNumber === sceneNumber);
+  if (!scene) {
+    return "";
   }
 
-  for (const suggestion of input.analysis.readerReport.revisionSuggestions.slice(0, 2)) {
-    additions.push(`【读者体验修订】${suggestion}`);
-  }
-
-  const activeCharacter = input.characterHistory.find((entry) => entry.latestState.presentInChapter);
-  if (activeCharacter) {
-    additions.push(
-      `【角色代价补强】${activeCharacter.name}继续被其选择拖入代价，当前压力是：${activeCharacter.latestState.decisionCost}。`,
-    );
-  }
-
-  return additions.join("\n\n");
+  return [
+    `【场景 ${scene.sceneNumber} 修订锚点】`,
+    `驱动角色：${scene.drivingCharacter}`,
+    `必须发生的决定：${scene.decision}`,
+    `必须兑现的代价：${scene.cost}`,
+    `关系变化：${scene.relationshipChange}`,
+    `主题冲突：${scene.thematicTension}`,
+    `价值对立：${scene.valuePositionA} vs ${scene.valuePositionB}`,
+    `风格执行：${scene.styleDirective}`,
+  ].join(" ");
 }
 
 export class HeuristicReviseEngine implements ReviseEngine {
   readonly name = "heuristic";
 
   async revise(input: RevisionInput): Promise<ChapterDraft> {
-    const revisedContent = [
-      input.draft.content,
-      "",
-      appendRevisionParagraphs(input),
-    ]
-      .join("\n\n")
-      .trim();
+    const sections = splitScenes(input.draft.content);
+    const revisedSections = sections.map((section, index) => {
+      const sceneNumber = index + 1;
+      const auditIssues = input.sceneAudit.issues.filter((issue) => issue.sceneNumber === sceneNumber);
+      const revisionNotes = [
+        buildSceneRevisionBlock(input, sceneNumber),
+        ...auditIssues.map((issue) => `【场景问题】${issue.problem}。${issue.recommendation}`),
+      ]
+        .filter((entry) => entry.length > 0)
+        .join("\n");
+
+      return [section, revisionNotes].filter((entry) => entry.length > 0).join("\n");
+    });
+
+    const styleControl = `【风格控制】叙述风格：${input.plan.styleProfile.narrationStyle}。对白风格：${input.plan.styleProfile.dialogueStyle}。节奏：${input.plan.styleProfile.pacingProfile}。描写密度：${input.plan.styleProfile.descriptionDensity}。语气约束：${input.plan.styleProfile.toneConstraints.join("，")}。`;
+    const readerFixes = input.analysis.readerReport.revisionSuggestions
+      .slice(0, 2)
+      .map((suggestion) => `【读者体验修订】${suggestion}`)
+      .join("\n");
+
+    const revisedContent = [styleControl, ...revisedSections, readerFixes].filter((entry) => entry.length > 0).join("\n\n");
 
     return {
       ...input.draft,
       content: revisedContent,
-      summary: `${input.draft.summary} 本版已根据 revision brief 与 scene audit 做局部修订。`,
+      summary: `${input.draft.summary} 本版已按角色决策、主题冲突与风格控制执行场景级修订。`,
     };
   }
 }
@@ -73,11 +90,12 @@ function buildPrompt(input: RevisionInput): string {
     "请根据以下内容修订小说章节草稿，输出完整修订后正文。",
     "",
     "要求：",
-    "1. 保留章节主任务与主题方向。",
-    "2. 优先修补场景目标、冲突、转折、结果、POV 漂移等问题。",
-    "3. 必须强化角色选择与代价，而不是只改句子。",
-    "4. 必须考虑风格约束与读者体验建议。",
-    "5. 只输出正文，不输出解释。",
+    "1. 每个 scene 必须围绕 driving character 的 decision 展开。",
+    "2. 每个 decision 必须兑现 cost，不能只有事件没有后果。",
+    "3. theme conflict 必须通过行为和对话体现，不能只用旁白解释。",
+    "4. 必须执行 style profile，尤其要控制对白差异、节奏和描写密度。",
+    "5. 如果某个 scene 只是信息搬运，必须重写为真正的选择场景。",
+    "6. 只输出正文，不输出解释。",
     "",
     "章节计划：",
     JSON.stringify(input.plan, null, 2),
@@ -145,7 +163,7 @@ export class OpenAIReviseEngine implements ReviseEngine {
     return {
       ...input.draft,
       content,
-      summary: `${input.draft.summary} 本版由 LLM 根据 revision brief 与 scene audit 修订。`,
+      summary: `${input.draft.summary} 本版由 LLM 根据角色/主题/风格约束执行修订。`,
     };
   }
 }
@@ -164,6 +182,27 @@ export function createReviseEngineFromEnv(): ReviseEngine {
   }
 
   return new HeuristicReviseEngine();
+}
+
+export function buildBlockingGateStatus(params: {
+  readonly analysis: ChapterAnalysisBundle;
+  readonly sceneAudit: SceneAuditReport;
+}): BlockingGateStatus {
+  const reasons: string[] = [];
+  if (params.analysis.readerReport.scores.hook < 5) {
+    reasons.push("hook 分过低");
+  }
+  if (params.analysis.readerReport.scores.momentum < 6) {
+    reasons.push("momentum 分过低");
+  }
+  if (params.sceneAudit.issues.some((issue) => issue.severity === "high")) {
+    reasons.push("scene audit 存在 high severity 问题");
+  }
+
+  return {
+    blocking: reasons.length > 0,
+    reasons,
+  };
 }
 
 export function buildRevisionComparisonReport(params: {

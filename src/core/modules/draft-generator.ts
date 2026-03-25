@@ -20,13 +20,10 @@ function buildOpeningParagraph(plan: ChapterPlan, leadName: string): string {
   return `${leadName}没有办法假装上一章什么都没发生。${plan.chapterMission}，这句话像一枚烫过的钉子，一路钉在她的胸口。`;
 }
 
-function buildThemeParagraph(themeHistory: ThemeHistory, leadName: string): string {
+function buildThemeParagraph(plan: ChapterPlan, themeHistory: ThemeHistory, leadName: string): string {
   const latest = themeHistory.timeline[themeHistory.timeline.length - 1];
-  if (!latest) {
-    return `${leadName}知道，真正逼近她的从来不只是事件本身，而是事件背后那道迟早要她选边站的价值裂缝。`;
-  }
-
-  return `${leadName}隐约明白，这一章真正压上来的不是单纯的危险，而是“${latest.theme}”与“${latest.antiTheme}”之间的碰撞。她越想把事情处理得干净，代价就越像影子一样贴近。`;
+  const themeHint = latest ? `${latest.theme}与${latest.antiTheme}` : plan.thematicQuestion;
+  return `${leadName}很清楚，这一章真正压上来的不只是事件本身，而是 ${themeHint} 的正面碰撞。她每向前一步，就更难假装自己还能不付代价。`;
 }
 
 function sceneToParagraphs(
@@ -34,22 +31,24 @@ function sceneToParagraphs(
   leadName: string,
   supportName: string | null,
 ): string[] {
-  const partner = supportName ?? "另一个人";
+  const partner = supportName ?? scene.opposingForce;
 
   return [
-    `【场景 ${scene.sceneNumber} / POV：${scene.pov}】${scene.goal}。${leadName}先注意到的不是答案，而是空气里一丝不对劲的停顿。`,
-    `冲突很快露出轮廓：${scene.conflict}。${partner}没有替她做决定，只是把问题原样推回来，逼她承认自己真正想要什么，又准备失去什么。`,
-    `转折发生在她意识到：${scene.turn}。这一刻让她没法再把自己当成旁观者。`,
-    `结果是 ${scene.result}。新的信息开始浮出：${scene.newInformation.join("；") || "没有新的信息被整理出来"}。情绪也从 ${scene.emotionalShift}。`,
+    `【场景 ${scene.sceneNumber} / POV：${scene.pov}】驱动场景的人是 ${scene.drivingCharacter}。他/她此刻的目标是：${scene.goal}。叙述必须遵守：${scene.styleDirective}。`,
+    `阻碍来自 ${scene.opposingForce}。真正推动本场景的不是事情发生了，而是 ${scene.drivingCharacter} 必须做出决定：${scene.decision}。`,
+    `${partner}不会让这个决定轻松落地，因为冲突是：${scene.conflict}。一旦做出选择，代价就会立刻出现：${scene.cost}。`,
+    `这一场真正的位移发生在：${scene.turn}。结果是 ${scene.result}。关系变化体现为：${scene.relationshipChange}。`,
+    `本场景承载的主题冲突是 ${scene.thematicTension}。价值对立两端分别是“${scene.valuePositionA}”与“${scene.valuePositionB}”，而场景当前站向 ${scene.sceneStance}。`,
+    `新的信息浮出：${scene.newInformation.join("；") || "暂无"}。情绪变化是 ${scene.emotionalShift}。这些内容必须通过动作、对话和后果体现，而不是仅靠旁白解释。`,
   ];
 }
 
 function buildEndingParagraph(plan: ChapterPlan, leadName: string): string {
-  return `${leadName}知道自己还没准备好，但章节最后留给她的从来不是“等准备好了再说”。${plan.readerGoal}${plan.gateNote}`;
+  return `${leadName}知道自己还没准备好，但章节最后留给她的从来不是“等准备好了再说”。${plan.readerGoal} 风格上继续保持：${plan.styleProfile.toneConstraints.join("，")}。${plan.gateNote}`;
 }
 
 function buildSummary(plan: ChapterPlan): string {
-  return `本章草稿围绕“${plan.chapterMission}”展开，通过 ${plan.sceneBlueprint.length} 个场景，把冲突、关系与主题压力同时往前推进。`;
+  return `本章草稿围绕“${plan.chapterMission}”展开，通过 ${plan.sceneBlueprint.length} 个场景，把角色决策、主题冲突和风格约束同时推进。`;
 }
 
 export class DraftGenerator {
@@ -66,7 +65,7 @@ export class DraftGenerator {
 
     const paragraphs: string[] = [
       buildOpeningParagraph(plan, leadName),
-      buildThemeParagraph(themeHistory, leadName),
+      buildThemeParagraph(plan, themeHistory, leadName),
       ...plan.sceneBlueprint.flatMap((scene) => sceneToParagraphs(scene, leadName, supportName)),
       buildEndingParagraph(plan, leadName),
     ];

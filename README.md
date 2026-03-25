@@ -137,5 +137,6 @@ STORYLAB_OPENAI_BASE_URL=https://your-compatible-endpoint/v1
 - [使用说明](./docs/usage.md)
 - [调用链说明](./docs/call-flows.md)
 - [修订闭环](./docs/revision-loop.md)
+- [Chapter 2 修订示例](./docs/chapter-2-walkthrough.md)
 - [路线图](./docs/roadmap.md)
 - [阶段进展评审包](./docs/progress-review.md)

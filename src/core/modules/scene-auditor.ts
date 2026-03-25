@@ -66,6 +66,34 @@ export class SceneAuditor {
         });
       }
 
+      const joined = actual.sourceParagraphs.join("\n");
+      if (!joined.includes("决定") && !joined.includes("选择")) {
+        issues.push({
+          sceneNumber: planned.sceneNumber,
+          severity: "high",
+          problem: "场景缺少明确决策",
+          recommendation: `补出由 ${planned.drivingCharacter} 做出的关键决策：${planned.decision}`,
+        });
+      }
+
+      if (!joined.includes("代价") && !joined.includes("后果")) {
+        issues.push({
+          sceneNumber: planned.sceneNumber,
+          severity: "high",
+          problem: "决策没有兑现代价",
+          recommendation: `让本场景明确体现代价：${planned.cost}`,
+        });
+      }
+
+      if (!joined.includes(planned.valuePositionA) && !joined.includes(planned.valuePositionB)) {
+        issues.push({
+          sceneNumber: planned.sceneNumber,
+          severity: "medium",
+          problem: "场景只有剧情推进，没有主题冲突",
+          recommendation: `让价值对立“${planned.valuePositionA} / ${planned.valuePositionB}”通过行为或对话显形。`,
+        });
+      }
+
       if (planned.pov !== "未明" && actual.pov !== planned.pov) {
         issues.push({
           sceneNumber: planned.sceneNumber,

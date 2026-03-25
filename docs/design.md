@@ -183,6 +183,8 @@
 - scene blueprint
 - character intent
 - theme intent
+- thematic question
+- style profile
 - gate note
 
 当前文件：
@@ -190,6 +192,43 @@
 - `story/planning/chapter-XXXX.chapter-plan.json`
 
 这个设计的意义是把“分析过去章节”和“规划下一章节”接起来，为 writer 主链准备明确输入。
+
+### Character / Theme / Style 如何进入 generation pipeline
+
+当前这一层已经不再只是“章节提纲”，而是包含三种硬约束：
+
+1. Character 约束  
+每个 `sceneBlueprint` 现在至少包含：
+- `drivingCharacter`
+- `opposingForce`
+- `decision`
+- `cost`
+- `relationshipChange`
+
+这意味着 draft 与 revise 都必须回答：
+- 谁在推动场景
+- 谁在阻碍
+- 该角色做了什么决定
+- 代价如何落地
+- 关系如何变化
+
+2. Theme 约束  
+每个 `sceneBlueprint` 现在至少包含：
+- `thematicTension`
+- `valuePositionA`
+- `valuePositionB`
+- `sceneStance`
+
+这意味着 scene 不再只是推进剧情，也必须承担价值冲突。
+
+3. Style 约束  
+`ChapterPlan` 现在包含：
+- `styleProfile`
+
+每个 `sceneBlueprint` 还会带：
+- `styleDirective`
+
+这意味着 draft / revise 不再只“参考风格说明”，而是必须消费结构化风格约束。
 
 ## 草稿生成设计
 
@@ -208,6 +247,28 @@
 - heuristic writer
 - OpenAI-compatible writer
 
+### 草稿生成现在必须吃哪些硬输入
+
+当前 draft 不只是读取 chapter mission，而是显式读取：
+
+- `sceneBlueprint.goal`
+- `sceneBlueprint.conflict`
+- `sceneBlueprint.turn`
+- `sceneBlueprint.result`
+- `sceneBlueprint.newInformation`
+- `sceneBlueprint.emotionalShift`
+- `sceneBlueprint.drivingCharacter`
+- `sceneBlueprint.opposingForce`
+- `sceneBlueprint.decision`
+- `sceneBlueprint.cost`
+- `sceneBlueprint.relationshipChange`
+- `sceneBlueprint.thematicTension`
+- `sceneBlueprint.sceneStance`
+- `sceneBlueprint.styleDirective`
+- `styleProfile`
+
+这使 `scene -> draft` 的约束开始变硬。
+
 ## 草稿评审闭环
 
 `draftCycle(bookId, targetChapterNumber)` 是当前新接上的第一版闭环：
@@ -224,6 +285,30 @@
 - `story/reviews/drafts/chapter-XXXX.draft-revision-brief.md`
 
 这一步的意义是把系统从“只会规划和出草稿”推进到“开始能对自己的草稿做结构化回看”。
+
+## 修订闭环中的 Character / Theme / Style
+
+`reviseCycle(bookId, targetChapterNumber)` 现在会把以下约束真正送进 revise engine：
+
+- 角色决策与代价
+- 主题冲突与价值对立
+- style profile 与 style directive
+- scene audit 问题
+
+当前 heuristic revise 仍然比较粗，但它已经开始围绕“scene 级修订锚点”工作，而不是整章泛化重写。
+
+## Blocking Gate 最小版
+
+当前已经加入最小 blocking gate：
+
+- 如果 `reader experience` 关键分数过低
+- 或 `scene audit` 出现 `high severity` 问题
+
+则：
+
+- `draft-cycle` / `revise-cycle` 会返回 blocking 状态
+- 默认阻断继续
+- 必须显式传 `--override` 才能继续
 
 ## 当前边界
 

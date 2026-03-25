@@ -17,6 +17,7 @@ import type {
 import { createAnalysisEngineFromEnv, type AnalysisEngine } from "../llm/analysis-engine.js";
 import { createDraftWriterFromEnv, type DraftWriter } from "../llm/draft-engine.js";
 import {
+  buildBlockingGateStatus,
   buildRevisionComparisonReport,
   createReviseEngineFromEnv,
   type ReviseEngine,
@@ -76,7 +77,8 @@ export class StorylabRunner {
 
   async planNext(bookId: string, targetChapterNumber: number): Promise<StorylabPlanResult> {
     await this.store.ensureStoryDirs(bookId);
-    const [characterHistory, themeHistory, storyMemory, gates] = await Promise.all([
+    const [styleGuide, characterHistory, themeHistory, storyMemory, gates] = await Promise.all([
+      this.store.loadStyleGuide(bookId),
       this.store.loadCharacterHistory(bookId),
       this.store.loadThemeHistory(bookId),
       this.store.loadStoryMemory(bookId),
@@ -89,6 +91,7 @@ export class StorylabRunner {
       themeHistory,
       memory: storyMemory,
       gates,
+      styleGuide,
     });
 
     const outputPath = await this.store.writeOutput(
@@ -129,7 +132,7 @@ export class StorylabRunner {
     };
   }
 
-  async draftCycle(bookId: string, targetChapterNumber: number): Promise<StorylabDraftCycleResult> {
+  async draftCycle(bookId: string, targetChapterNumber: number, override = false): Promise<StorylabDraftCycleResult> {
     await this.store.ensureStoryDirs(bookId);
     const [draftResult, book, plan, characterSeeds, themeSeeds, styleGuide, gates] = await Promise.all([
       this.draftFromPlan(bookId, targetChapterNumber),
@@ -155,6 +158,10 @@ export class StorylabRunner {
       gates,
     );
     const sceneAudit = this.sceneAuditor.audit(plan.sceneBlueprint, analysis.scenes);
+    const blockingGate = buildBlockingGateStatus({ analysis, sceneAudit });
+    if (blockingGate.blocking && !override) {
+      throw new Error(`Blocking gate triggered: ${blockingGate.reasons.join("; ")}. Re-run with --override to continue.`);
+    }
     const reviewArtifacts = await this.writeDraftReviewArtifacts(bookId, targetChapterNumber, book, analysis, sceneAudit);
 
     return {
@@ -164,10 +171,11 @@ export class StorylabRunner {
       provider: draftResult.provider,
       reviewPath: reviewArtifacts.reviewPath,
       revisionBriefPath: reviewArtifacts.revisionBriefPath,
+      blockingGate,
     };
   }
 
-  async reviseCycle(bookId: string, targetChapterNumber: number): Promise<StorylabRevisionCycleResult> {
+  async reviseCycle(bookId: string, targetChapterNumber: number, override = false): Promise<StorylabRevisionCycleResult> {
     await this.store.ensureStoryDirs(bookId);
 
     const [book, plan, characterSeeds, themeSeeds, styleGuide, gates, previousCharacterHistory, previousThemeHistory, previousMemory] = await Promise.all([
@@ -205,6 +213,10 @@ export class StorylabRunner {
       gates,
     );
     const beforeSceneAudit = this.sceneAuditor.audit(plan.sceneBlueprint, beforeAnalysis.scenes);
+    const blockingGate = buildBlockingGateStatus({ analysis: beforeAnalysis, sceneAudit: beforeSceneAudit });
+    if (blockingGate.blocking && !override) {
+      throw new Error(`Blocking gate triggered: ${blockingGate.reasons.join("; ")}. Re-run with --override to continue.`);
+    }
     const beforeArtifacts = await this.writeDraftReviewArtifacts(
       bookId,
       targetChapterNumber,
@@ -274,6 +286,7 @@ export class StorylabRunner {
       revisedReviewPath: revisedArtifacts.reviewPath,
       comparisonPath,
       provider: this.reviseEngine.name,
+      blockingGate,
     };
   }
 

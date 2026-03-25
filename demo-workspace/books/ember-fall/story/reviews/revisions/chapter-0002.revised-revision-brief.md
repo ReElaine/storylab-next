@@ -9,8 +9,8 @@
 - Memorability: 6/10
 
 ## Character Pressure
-- 林炽: decision=林炽做出了带风险的明确选择; cost=身体代价已经显性出现; arc=角色弧线处于起步阶段
-- 沈砚: decision=沈砚做出了带风险的明确选择; cost=身体代价已经显性出现; arc=角色弧线处于起步阶段
+- 林炽: decision=林炽做出了带风险的明确选择; cost=身体代价已经显性出现; arc=角色继续按照旧误判行动，但裂缝已经出现
+- 沈砚: decision=沈砚做出了带风险的明确选择; cost=身体代价已经显性出现; arc=角色继续按照旧误判行动，但裂缝已经出现
 
 ## Theme Focus
 - Theme: 代价与亲密; anti-theme pressure: 力量可以无损获得; note: 本章让主题方向先于事件被读者感知

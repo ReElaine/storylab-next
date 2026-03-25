@@ -10,8 +10,8 @@ function printUsage(): void {
       "  storylab-next run <workspaceDir> <bookId> <chapterNumber>",
       "  storylab-next plan-next <workspaceDir> <bookId> <targetChapterNumber>",
       "  storylab-next draft-from-plan <workspaceDir> <bookId> <targetChapterNumber>",
-      "  storylab-next draft-cycle <workspaceDir> <bookId> <targetChapterNumber>",
-      "  storylab-next revise-cycle <workspaceDir> <bookId> <targetChapterNumber>",
+      "  storylab-next draft-cycle <workspaceDir> <bookId> <targetChapterNumber> [--override]",
+      "  storylab-next revise-cycle <workspaceDir> <bookId> <targetChapterNumber> [--override]",
       "",
     ].join("\n"),
   );
@@ -96,7 +96,7 @@ export async function main(args: string[]): Promise<void> {
   }
 
   if (command === "draft-cycle") {
-    const [workspaceDir, bookId, chapterNumberRaw] = rest;
+    const [workspaceDir, bookId, chapterNumberRaw, ...flags] = rest;
     if (!workspaceDir || !bookId || !chapterNumberRaw) {
       printUsage();
       process.exitCode = 1;
@@ -109,13 +109,13 @@ export async function main(args: string[]): Promise<void> {
     }
 
     const runner = new StorylabRunner(resolve(workspaceDir));
-    const result = await runner.draftCycle(bookId, targetChapterNumber);
+    const result = await runner.draftCycle(bookId, targetChapterNumber, flags.includes("--override"));
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
   }
 
   if (command === "revise-cycle") {
-    const [workspaceDir, bookId, chapterNumberRaw] = rest;
+    const [workspaceDir, bookId, chapterNumberRaw, ...flags] = rest;
     if (!workspaceDir || !bookId || !chapterNumberRaw) {
       printUsage();
       process.exitCode = 1;
@@ -128,7 +128,7 @@ export async function main(args: string[]): Promise<void> {
     }
 
     const runner = new StorylabRunner(resolve(workspaceDir));
-    const result = await runner.reviseCycle(bookId, targetChapterNumber);
+    const result = await runner.reviseCycle(bookId, targetChapterNumber, flags.includes("--override"));
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
   }

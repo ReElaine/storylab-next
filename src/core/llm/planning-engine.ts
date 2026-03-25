@@ -3,6 +3,7 @@ import type {
   CharacterHistory,
   HumanGate,
   StoryMemory,
+  StyleGuide,
   ThemeHistory,
 } from "../types.js";
 import { ChapterPlanner } from "../modules/chapter-planner.js";
@@ -14,6 +15,7 @@ export interface PlanningInput {
   readonly themeHistory: ThemeHistory;
   readonly memory: StoryMemory;
   readonly gates: ReadonlyArray<HumanGate>;
+  readonly styleGuide: StyleGuide;
 }
 
 export interface PlanningEngine {
@@ -32,6 +34,7 @@ export class HeuristicPlanningEngine implements PlanningEngine {
       input.themeHistory,
       input.memory,
       input.gates,
+      input.styleGuide,
     );
   }
 }
@@ -75,8 +78,11 @@ export class OpenAIPlanningEngine implements PlanningEngine {
             "human gates：",
             JSON.stringify(input.gates, null, 2),
             "",
+            "style guide：",
+            JSON.stringify(input.styleGuide, null, 2),
+            "",
             "请输出符合 ChapterPlan 的 JSON，必须包含：",
-            "targetChapterNumber, chapterMission, readerGoal, sceneBlueprint, characterIntent, themeIntent, gateNote",
+            "targetChapterNumber, chapterMission, readerGoal, sceneBlueprint, characterIntent, themeIntent, thematicQuestion, styleProfile, gateNote",
           ].join("\n"),
         },
       ],
@@ -95,6 +101,8 @@ export class OpenAIPlanningEngine implements PlanningEngine {
       sceneBlueprint: parsed.sceneBlueprint ?? fallback.sceneBlueprint,
       characterIntent: parsed.characterIntent ?? fallback.characterIntent,
       themeIntent: parsed.themeIntent ?? fallback.themeIntent,
+      thematicQuestion: parsed.thematicQuestion ?? fallback.thematicQuestion,
+      styleProfile: parsed.styleProfile ?? fallback.styleProfile,
       gateNote: parsed.gateNote ?? fallback.gateNote,
     };
   }

@@ -36,6 +36,14 @@ export interface StyleGuide {
   readonly paragraphStrategy: string;
 }
 
+export interface StyleProfile {
+  readonly narrationStyle: string;
+  readonly dialogueStyle: string;
+  readonly pacingProfile: string;
+  readonly descriptionDensity: string;
+  readonly toneConstraints: ReadonlyArray<string>;
+}
+
 export interface HumanGate {
   readonly key: string;
   readonly label: string;
@@ -85,6 +93,9 @@ export interface StyleReport {
   readonly descriptionRatio: number;
   readonly rhythmNote: string;
   readonly adherenceNote: string;
+  readonly styleDriftPoints: ReadonlyArray<string>;
+  readonly dialogueHomogeneitySpots: ReadonlyArray<string>;
+  readonly descriptionBalanceNote: string;
 }
 
 export interface ReaderExperienceReport {
@@ -157,6 +168,16 @@ export interface SceneBlueprintItem {
   readonly result: string;
   readonly newInformation: ReadonlyArray<string>;
   readonly emotionalShift: string;
+  readonly drivingCharacter: string;
+  readonly opposingForce: string;
+  readonly decision: string;
+  readonly cost: string;
+  readonly relationshipChange: string;
+  readonly thematicTension: string;
+  readonly valuePositionA: string;
+  readonly valuePositionB: string;
+  readonly sceneStance: string;
+  readonly styleDirective: string;
 }
 
 export interface ChapterPlan {
@@ -170,6 +191,8 @@ export interface ChapterPlan {
     readonly costPressure: string;
   }>;
   readonly themeIntent: string;
+  readonly thematicQuestion: string;
+  readonly styleProfile: StyleProfile;
   readonly gateNote: string;
 }
 
@@ -229,6 +252,11 @@ export interface SceneAuditReport {
   readonly issues: ReadonlyArray<SceneAuditIssue>;
 }
 
+export interface BlockingGateStatus {
+  readonly blocking: boolean;
+  readonly reasons: ReadonlyArray<string>;
+}
+
 export interface RevisionComparisonReport {
   readonly chapterNumber: number;
   readonly readerScoreDelta: {
@@ -251,6 +279,7 @@ export interface StorylabDraftCycleResult {
   readonly provider: string;
   readonly reviewPath: string;
   readonly revisionBriefPath: string;
+  readonly blockingGate: BlockingGateStatus;
 }
 
 export interface StorylabRevisionCycleResult {
@@ -262,4 +291,5 @@ export interface StorylabRevisionCycleResult {
   readonly revisedReviewPath: string;
   readonly comparisonPath: string;
   readonly provider: string;
+  readonly blockingGate: BlockingGateStatus;
 }

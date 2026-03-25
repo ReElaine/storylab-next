@@ -2,17 +2,18 @@
   "chapterNumber": 2,
   "readerScoreDelta": {
     "hook": 0,
-    "momentum": 1,
+    "momentum": 0,
     "emotionalPeak": 0,
     "suspense": 0,
     "memorability": 0
   },
-  "sceneIssueDelta": 0,
+  "sceneIssueDelta": 1,
   "summary": "本轮修订后共有 1 项关键指标改善。",
   "improved": [
-    "章节推进感增强"
+    "场景结构问题减少"
   ],
   "unresolved": [
+    "仍存在未完全解决的场景问题",
     "情绪峰值仍未明显提升",
     "记忆点仍可继续强化"
   ]

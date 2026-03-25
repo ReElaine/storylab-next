@@ -115,6 +115,8 @@ node dist/index.js draft-from-plan ./demo-workspace ember-fall 2
 
 ```bash
 node dist/index.js draft-cycle ./demo-workspace ember-fall 2
+# 或在 blocking gate 触发时
+node dist/index.js draft-cycle ./demo-workspace ember-fall 2 --override
 ```
 
 作用：
@@ -128,6 +130,8 @@ node dist/index.js draft-cycle ./demo-workspace ember-fall 2
 
 ```bash
 node dist/index.js revise-cycle ./demo-workspace ember-fall 2
+# 或在 blocking gate 触发时
+node dist/index.js revise-cycle ./demo-workspace ember-fall 2 --override
 ```
 
 作用：
@@ -138,6 +142,7 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2
 - 对修订后版本重新 analysis
 - 输出 before / after comparison
 - 将修订后结果写回 history 与 memory
+- 如果 blocking gate 命中，默认阻断，除非显式传 `--override`
 
 ## 关键输出文件
 

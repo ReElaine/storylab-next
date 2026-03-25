@@ -11,7 +11,7 @@
       "relationshipShift": [
         "林炽与沈砚从互相试探的盟友向高压协作移动"
       ],
-      "arcProgress": "角色弧线处于起步阶段",
+      "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现",
       "presentInChapter": true
     },
     "timeline": [
@@ -46,6 +46,14 @@
         "recentDecision": "林炽做出了带风险的明确选择",
         "decisionCost": "身体代价已经显性出现",
         "arcProgress": "角色弧线处于起步阶段"
+      },
+      {
+        "chapterNumber": 2,
+        "desire": "证明自己配得上继承母亲留下的火种",
+        "fear": "一旦失控就会伤到身边的人",
+        "recentDecision": "林炽做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
       }
     ]
   },
@@ -61,7 +69,7 @@
       "relationshipShift": [
         "沈砚与林炽从观察中的合作对象向高压协作移动"
       ],
-      "arcProgress": "角色弧线处于起步阶段",
+      "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现",
       "presentInChapter": true
     },
     "timeline": [
@@ -96,6 +104,14 @@
         "recentDecision": "沈砚做出了带风险的明确选择",
         "decisionCost": "身体代价已经显性出现",
         "arcProgress": "角色弧线处于起步阶段"
+      },
+      {
+        "chapterNumber": 2,
+        "desire": "找到失踪调查员留下的真相",
+        "fear": "再次信错人",
+        "recentDecision": "沈砚做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
       }
     ]
   }

@@ -13,7 +13,17 @@
       "newInformation": [
         "上一章遗留的问题出现了更具体的新解释"
       ],
-      "emotionalShift": "试探 -> 紧张"
+      "emotionalShift": "试探 -> 紧张",
+      "drivingCharacter": "林炽",
+      "opposingForce": "沈砚",
+      "decision": "林炽必须决定是继续推进，还是暂时后撤",
+      "cost": "林炽一旦继续推进，就要先付出 身体代价已经显性出现",
+      "relationshipChange": "林炽与沈砚从试探进入高压协作",
+      "thematicTension": "代价与亲密 对 力量可以无损获得",
+      "valuePositionA": "代价与亲密",
+      "valuePositionB": "力量可以无损获得",
+      "sceneStance": "先压向 代价与亲密",
+      "styleDirective": "叙述遵循“近距离第三人称，压迫感强，少解释，多让动作和环境渗出情绪”，节奏按“短句推进冲突，中句承接信息，长句只用于情绪波峰前后”推进"
     },
     {
       "sceneNumber": 2,
@@ -25,7 +35,17 @@
       "newInformation": [
         "新的事实改变了角色对风险的判断"
       ],
-      "emotionalShift": "紧张 -> 压迫"
+      "emotionalShift": "紧张 -> 压迫",
+      "drivingCharacter": "林炽",
+      "opposingForce": "沈砚",
+      "decision": "林炽必须在隐瞒、求助或抢先行动之间做决定",
+      "cost": "该决定会立刻带来 身体代价已经显性出现",
+      "relationshipChange": "林炽与沈砚的关系被迫重新划线",
+      "thematicTension": "价值冲突通过选择体现：本章让主题方向先于事件被读者感知",
+      "valuePositionA": "代价与亲密",
+      "valuePositionB": "力量可以无损获得",
+      "sceneStance": "让角色用行动偏向 代价与亲密",
+      "styleDirective": "对白必须体现“对白必须区分人物策略，不允许所有角色说话一个腔调”，避免所有角色说话同质化"
     },
     {
       "sceneNumber": 3,
@@ -37,7 +57,17 @@
       "newInformation": [
         "主题冲突第一次以不可回避的方式显形"
       ],
-      "emotionalShift": "压迫 -> 失衡"
+      "emotionalShift": "压迫 -> 失衡",
+      "drivingCharacter": "林炽",
+      "opposingForce": "沈砚与更大的系统压力",
+      "decision": "林炽必须接受代价已经发生，而不是继续自我合理化",
+      "cost": "代价从抽象威胁变成具体后果",
+      "relationshipChange": "林炽与沈砚的信任被重新定义",
+      "thematicTension": "让 代价与亲密 暂时占上风，但保留 力量可以无损获得 的诱惑",
+      "valuePositionA": "代价与亲密",
+      "valuePositionB": "力量可以无损获得",
+      "sceneStance": "本场景明确站向 代价与亲密",
+      "styleDirective": "结尾必须保留追读钩子，同时维持“动作场景低描写密度，情绪停顿时提高感官描写”的描写密度"
     }
   ],
   "characterIntent": [
@@ -53,5 +83,17 @@
     }
   ],
   "themeIntent": "本章要推进“代价与亲密”对“力量可以无损获得”的压制，并通过角色选择承载价值冲突。",
+  "thematicQuestion": "本章是否要让“代价与亲密”击败“力量可以无损获得”？",
+  "styleProfile": {
+    "narrationStyle": "近距离第三人称，压迫感强，少解释，多让动作和环境渗出情绪",
+    "dialogueStyle": "对白必须区分人物策略，不允许所有角色说话一个腔调",
+    "pacingProfile": "短句推进冲突，中句承接信息，长句只用于情绪波峰前后",
+    "descriptionDensity": "动作场景低描写密度，情绪停顿时提高感官描写",
+    "toneConstraints": [
+      "一段只承担一个推进功能，避免平均长度段落",
+      "避免空泛解释",
+      "优先用动作和对话承载冲突"
+    ]
+  },
   "gateNote": "本章没有命中阻断式 gate，但仍需按 revision brief 自查。"
 }
