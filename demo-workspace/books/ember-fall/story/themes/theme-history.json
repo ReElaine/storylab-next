@@ -55,6 +55,22 @@
       "themeSignalCount": 22,
       "antiSignalCount": 0,
       "interpretation": "本章让主题方向先于事件被读者感知"
+    },
+    {
+      "chapterNumber": 2,
+      "theme": "代价与亲密",
+      "antiTheme": "力量可以无损获得",
+      "themeSignalCount": 19,
+      "antiSignalCount": 0,
+      "interpretation": "本章让主题方向先于事件被读者感知"
+    },
+    {
+      "chapterNumber": 2,
+      "theme": "代价与亲密",
+      "antiTheme": "力量可以无损获得",
+      "themeSignalCount": 19,
+      "antiSignalCount": 0,
+      "interpretation": "本章让主题方向先于事件被读者感知"
     }
   ]
 }

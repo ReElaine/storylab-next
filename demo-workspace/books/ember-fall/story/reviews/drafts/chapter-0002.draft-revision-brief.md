@@ -3,7 +3,7 @@
 ## Reader Experience
 - Summary: 本章具备合格开篇牵引力，最大优势是结尾回钩，最大风险是中段惊异感还可以更陡。
 - Hook: 6/10
-- Momentum: 10/10
+- Momentum: 7/10
 - Emotional Peak: 3/10
 - Suspense: 3/10
 - Memorability: 6/10

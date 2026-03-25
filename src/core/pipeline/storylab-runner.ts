@@ -229,7 +229,12 @@ export class StorylabRunner {
       beforeSceneAudit,
     );
 
-    const revisedDraft = await this.reviseEngine.revise({
+    const targetSceneNumbers =
+      blockingGate.blockingScenes.length > 0
+        ? blockingGate.blockingScenes.map((entry) => entry.sceneNumber)
+        : beforeSceneAudit.issues.map((issue) => issue.sceneNumber);
+
+    const revisionResult = await this.reviseEngine.revise({
       draft: beforeDraft,
       plan,
       analysis: beforeAnalysis,
@@ -237,11 +242,9 @@ export class StorylabRunner {
       characterHistory: previousCharacterHistory,
       themeHistory: previousThemeHistory,
       styleGuide,
-      targetSceneNumbers:
-        blockingGate.blockingScenes.length > 0
-          ? blockingGate.blockingScenes.map((entry) => entry.sceneNumber)
-          : beforeSceneAudit.issues.map((issue) => issue.sceneNumber),
+      targetSceneNumbers,
     });
+    const revisedDraft = revisionResult.draft;
     const revisedDraftPath = await this.store.writeRevisedDraft(bookId, revisedDraft);
 
     const afterAnalysis = await this.analyzeChapterText(
@@ -270,6 +273,7 @@ export class StorylabRunner {
       plan,
       beforeDraftContent: beforeDraft.content,
       afterDraftContent: revisedDraft.content,
+      trace: revisionResult.trace,
     });
     const comparisonPath = await this.store.writeOutput(
       bookId,
@@ -298,6 +302,9 @@ export class StorylabRunner {
       comparisonPath,
       provider: this.reviseEngine.name,
       blockingGate,
+      targetSceneNumbers: revisionResult.trace.targetSceneNumbers,
+      actualRewrittenSceneNumbers: revisionResult.trace.actualRewrittenSceneNumbers,
+      comparisonSceneNumbers: revisionResult.trace.comparisonSceneNumbers,
     };
   }
 

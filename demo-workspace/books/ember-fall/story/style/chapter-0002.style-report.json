@@ -1,10 +1,14 @@
 {
-  "averageSentenceLength": 29,
-  "dialogueRatio": 0.22727272727272727,
-  "descriptionRatio": 0.22727272727272727,
+  "averageSentenceLength": 25.319148936170212,
+  "dialogueRatio": 0,
+  "descriptionRatio": 0.21739130434782608,
   "rhythmNote": "句长偏稳，需要注意是否压低了冲突速度",
-  "adherenceNote": "目标叙述风格为“近距离第三人称，压迫感强，少解释，多让动作和环境渗出情绪”，当前对白占比 0.23，描写占比 0.23。",
-  "styleDriftPoints": [],
-  "dialogueHomogeneitySpots": [],
+  "adherenceNote": "目标叙述风格为“近距离第三人称，压迫感强，少解释，多让动作和环境渗出情绪”，当前对白占比 0.00，描写占比 0.22。",
+  "styleDriftPoints": [
+    "对白偏少，人物声音不够显性"
+  ],
+  "dialogueHomogeneitySpots": [
+    "需要增加角色间差异化对白，避免所有角色都像同一个叙述者"
+  ],
   "descriptionBalanceNote": "建议按“动作场景低描写密度，情绪停顿时提高感官描写”控制描写密度，并结合“一段只承担一个推进功能，避免平均长度段落”整理段落功能。"
 }

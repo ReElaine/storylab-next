@@ -52,6 +52,8 @@ export interface HumanGate {
 }
 
 export interface ScenePlanItem {
+  readonly sceneId: string;
+  readonly sceneAnchor: string;
   readonly sceneNumber: number;
   readonly pov: string;
   readonly goal: string;
@@ -160,6 +162,8 @@ export interface StoryMemory {
 }
 
 export interface SceneBlueprintItem {
+  readonly sceneId: string;
+  readonly sceneAnchor: string;
   readonly sceneNumber: number;
   readonly pov: string;
   readonly goal: string;
@@ -261,13 +265,34 @@ export interface BlockingGateStatus {
   }>;
 }
 
+export interface SceneRewriteMetadata {
+  readonly reason: ReadonlyArray<string>;
+  readonly strategy: ReadonlyArray<string>;
+}
+
+export interface RevisionTrace {
+  readonly targetSceneNumbers: ReadonlyArray<number>;
+  readonly actualRewrittenSceneNumbers: ReadonlyArray<number>;
+  readonly unchangedSceneNumbers: ReadonlyArray<number>;
+  readonly reviewedButNotRewrittenSceneNumbers: ReadonlyArray<number>;
+  readonly comparisonSceneNumbers: ReadonlyArray<number>;
+  readonly sceneRewriteMetadata: Readonly<Record<string, SceneRewriteMetadata>>;
+}
+
 export interface SceneRevisionExplanation {
   readonly sceneNumber: number;
+  readonly sceneId?: string;
+  readonly sceneAnchor?: string;
   readonly beforeProblems: ReadonlyArray<string>;
-  readonly rewriteStrategy: ReadonlyArray<string>;
+  readonly appliedRewriteStrategy: ReadonlyArray<string>;
+  readonly textualChangeEvidence: ReadonlyArray<string>;
   readonly characterChange: string;
   readonly themeChange: string;
   readonly styleChange: string;
+  readonly postRewriteAssessment: {
+    readonly resolvedProblems: ReadonlyArray<string>;
+    readonly remainingProblems: ReadonlyArray<string>;
+  };
   readonly beforeExcerpt: string;
   readonly afterExcerpt: string;
 }
@@ -285,7 +310,27 @@ export interface RevisionComparisonReport {
   readonly summary: string;
   readonly improved: ReadonlyArray<string>;
   readonly unresolved: ReadonlyArray<string>;
+  readonly targetSceneNumbers: ReadonlyArray<number>;
+  readonly actualRewrittenSceneNumbers: ReadonlyArray<number>;
+  readonly comparisonSceneNumbers: ReadonlyArray<number>;
+  readonly unchangedSceneNumbers: ReadonlyArray<number>;
+  readonly reviewedButNotRewrittenSceneNumbers: ReadonlyArray<number>;
+  readonly sceneRewriteMetadata: Readonly<Record<string, SceneRewriteMetadata>>;
+  readonly sceneAlignment: {
+    readonly mappingBasis: string;
+    readonly beforeParsedSceneNumbers: ReadonlyArray<number>;
+    readonly afterParsedSceneNumbers: ReadonlyArray<number>;
+    readonly beforeAnalysisSceneNumbers: ReadonlyArray<number>;
+    readonly afterAnalysisSceneNumbers: ReadonlyArray<number>;
+    readonly stableByParsedScenes: boolean;
+    readonly stableByAnalysisScenes: boolean;
+  };
   readonly sceneChanges: ReadonlyArray<SceneRevisionExplanation>;
+}
+
+export interface RevisionResult {
+  readonly draft: ChapterDraft;
+  readonly trace: RevisionTrace;
 }
 
 export interface StorylabDraftCycleResult {
@@ -308,4 +353,7 @@ export interface StorylabRevisionCycleResult {
   readonly comparisonPath: string;
   readonly provider: string;
   readonly blockingGate: BlockingGateStatus;
+  readonly targetSceneNumbers: ReadonlyArray<number>;
+  readonly actualRewrittenSceneNumbers: ReadonlyArray<number>;
+  readonly comparisonSceneNumbers: ReadonlyArray<number>;
 }

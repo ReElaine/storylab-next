@@ -71,6 +71,8 @@ function normalizeScenes(raw: ReadonlyArray<ScenePlanItem>, chapterText: string)
 
   return [
     {
+      sceneId: "scene-1",
+      sceneAnchor: "scene-1-未明",
       sceneNumber: 1,
       pov: "未明",
       goal: "从章节正文中提取场景目标",
@@ -79,7 +81,7 @@ function normalizeScenes(raw: ReadonlyArray<ScenePlanItem>, chapterText: string)
       result: "从章节正文中提取结果",
       newInformation: [],
       emotionalShift: "待补充",
-      sourceParagraphs: chapterText.split(/\r?\n/).filter((line) => line.trim().length > 0).slice(0, 3),
+      sourceParagraphs: chapterText.split(/\r?\n/u).filter((line) => line.trim().length > 0).slice(0, 3),
     },
   ];
 }

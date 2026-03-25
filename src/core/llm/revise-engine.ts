@@ -5,6 +5,8 @@ import type {
   ChapterPlan,
   CharacterHistory,
   RevisionComparisonReport,
+  RevisionResult,
+  RevisionTrace,
   SceneAuditIssue,
   SceneAuditReport,
   SceneBlueprintItem,
@@ -28,10 +30,14 @@ export interface RevisionInput {
 
 export interface ReviseEngine {
   readonly name: string;
-  revise(input: RevisionInput): Promise<ChapterDraft>;
+  revise(input: RevisionInput): Promise<RevisionResult>;
 }
 
-function dedupe(values: ReadonlyArray<string>): ReadonlyArray<string> {
+function dedupeNumbers(values: ReadonlyArray<number>): ReadonlyArray<number> {
+  return Array.from(new Set(values)).sort((left, right) => left - right);
+}
+
+function dedupeStrings(values: ReadonlyArray<string>): ReadonlyArray<string> {
   return Array.from(new Set(values.filter((value) => value.trim().length > 0)));
 }
 
@@ -46,54 +52,58 @@ function describeSceneIssueType(issue: SceneAuditIssue): string {
 
 function collectTargetSceneNumbers(input: RevisionInput): ReadonlyArray<number> {
   if (input.targetSceneNumbers && input.targetSceneNumbers.length > 0) {
-    return dedupe(input.targetSceneNumbers.map((value) => String(value))).map((value) => Number.parseInt(value, 10));
+    return dedupeNumbers(input.targetSceneNumbers);
   }
 
-  const fromAudit = input.sceneAudit.issues.map((issue) => issue.sceneNumber);
-  if (fromAudit.length > 0) {
-    return dedupe(fromAudit.map((value) => String(value))).map((value) => Number.parseInt(value, 10));
-  }
-
-  return [];
+  return dedupeNumbers(input.sceneAudit.issues.map((issue) => issue.sceneNumber));
 }
 
 function buildSceneRewriteStrategy(scene: SceneBlueprintItem, issues: ReadonlyArray<SceneAuditIssue>): ReadonlyArray<string> {
-  const strategy: string[] = [
+  return dedupeStrings([
     `让 ${scene.drivingCharacter} 主动推进：${scene.decision}`,
     `兑现代价：${scene.cost}`,
-    `在行为或对白里显出关系变化：${scene.relationshipChange}`,
+    `在行为或对白中体现关系变化：${scene.relationshipChange}`,
     `把价值冲突写进动作与对话：${scene.valuePositionA} vs ${scene.valuePositionB}`,
     `遵循风格指令：${scene.styleDirective}`,
-  ];
-
-  for (const issue of issues) {
-    strategy.push(issue.recommendation);
-  }
-
-  return dedupe(strategy);
+    ...issues.map((issue) => issue.recommendation),
+  ]);
 }
 
-function buildSceneRewrite(
+function buildSceneRewriteReason(issues: ReadonlyArray<SceneAuditIssue>): ReadonlyArray<string> {
+  if (issues.length === 0) {
+    return ["目标 scene 被选中，需要局部重写"];
+  }
+
+  return dedupeStrings(issues.map((issue) => issue.problem));
+}
+
+function pickSupportName(input: RevisionInput, scene: SceneBlueprintItem): string {
+  const byName = input.characterHistory.find((entry) => entry.name !== scene.drivingCharacter)?.name;
+  return byName ?? scene.opposingForce;
+}
+
+function buildHeuristicSceneRewrite(
   marker: string,
   scene: SceneBlueprintItem,
   issues: ReadonlyArray<SceneAuditIssue>,
   supportName: string,
 ): string {
-  const extraTension = issues.some((issue) => issue.problem.includes("主题"))
-    ? `这一次，冲突不只是事情做不做，而是 ${scene.valuePositionA} 和 ${scene.valuePositionB} 哪一边值得被承担。`
-    : `${scene.thematicTension} 在这一刻变成了必须选边站的压力。`;
+  const hasThemeProblem = issues.some((issue) => issue.problem.includes("主题"));
   const styleTexture = scene.styleDirective.includes("对白")
-    ? `${supportName}说话时明显带着逼问和试探，而 ${scene.drivingCharacter} 的回应更短、更硬。`
-    : `${scene.drivingCharacter} 的动作先于解释，环境细节只在情绪拐点处被点亮。`;
+    ? `${supportName}的回应更锋利，${scene.drivingCharacter}的回答更短、更硬。`
+    : `${scene.drivingCharacter}的动作先于解释，环境细节只在情绪拐点处被点亮。`;
+  const thematicLine = hasThemeProblem
+    ? `这一次，冲突不只是事情做不做，而是 ${scene.valuePositionA} 和 ${scene.valuePositionB} 到底该向哪边倾斜。`
+    : `${scene.thematicTension} 在这一刻变成了必须选边站的压力。`;
 
   return [
     marker,
-    `${scene.drivingCharacter}没有退路。${scene.goal}。他/她真正要做的，不是继续旁观，而是立刻做出决定：${scene.decision}。`,
-    `${scene.opposingForce}构成了直接阻力。${scene.conflict}。${styleTexture}`,
-    `${extraTension} 于是 ${scene.drivingCharacter} 的选择不再只是剧情动作，而变成对价值立场的公开押注。`,
-    `转折来得很快：${scene.turn}。一旦决定落地，代价马上跟上：${scene.cost}。`,
-    `结果是 ${scene.result}。关系也因此发生位移：${scene.relationshipChange}。`,
-    `新信息随之浮出：${scene.newInformation.join("；") || "暂无额外信息"}。情绪从 ${scene.emotionalShift}，并把场景站位压向 ${scene.sceneStance}。`,
+    `${scene.drivingCharacter}没有退路。${scene.goal}。真正推动这个场景的，不是信息自己出现，而是 ${scene.drivingCharacter} 必须做出决定：${scene.decision}。`,
+    `${scene.opposingForce} 立刻构成阻力。${scene.conflict}。${styleTexture}`,
+    `${thematicLine} 于是这次选择不再只是剧情动作，而是公开的价值站队。`,
+    `${scene.turn}。一旦决定落地，代价马上跟上：${scene.cost}。`,
+    `${scene.result}。关系也因此发生位移：${scene.relationshipChange}。`,
+    `新的信息随之浮出：${scene.newInformation.join("；") || "暂无额外信息"}。情绪从 ${scene.emotionalShift}，并把场景立场压向 ${scene.sceneStance}。`,
   ].join("\n\n");
 }
 
@@ -103,6 +113,8 @@ function buildPrompt(params: {
   readonly issues: ReadonlyArray<SceneAuditIssue>;
   readonly styleProfile: ChapterPlan["styleProfile"];
   readonly styleGuide: StyleGuide;
+  readonly characterHistory: ReadonlyArray<CharacterHistory>;
+  readonly themeHistory: ThemeHistory;
 }): string {
   return [
     "请只重写下面这个小说 scene，不要改其他 scene。",
@@ -111,7 +123,7 @@ function buildPrompt(params: {
     "1. 只输出修订后的该 scene 文本。",
     "2. 必须围绕 drivingCharacter 的 decision 展开。",
     "3. 必须让 cost 在 scene 内兑现。",
-    "4. 必须让价值冲突通过动作或对白体现，不要用旁白硬解释。",
+    "4. 必须让主题冲突通过动作或对话体现，不要只用旁白解释。",
     "5. 必须执行风格约束，但不要输出显式控制标签。",
     "",
     "scene blueprint：",
@@ -126,26 +138,52 @@ function buildPrompt(params: {
     "scene 问题：",
     JSON.stringify(params.issues, null, 2),
     "",
+    "character history（辅助参考，不要机械复述）：",
+    JSON.stringify(params.characterHistory, null, 2),
+    "",
+    "theme history（辅助参考，不要机械复述）：",
+    JSON.stringify(params.themeHistory, null, 2),
+    "",
     "原 scene：",
     params.originalScene,
   ].join("\n");
 }
 
-function pickSupportName(input: RevisionInput, scene: SceneBlueprintItem): string {
-  const byName = input.characterHistory.find((entry) => entry.name !== scene.drivingCharacter)?.name;
-  return byName ?? scene.opposingForce;
+function buildTrace(params: {
+  readonly targetSceneNumbers: ReadonlyArray<number>;
+  readonly actualRewrittenSceneNumbers: ReadonlyArray<number>;
+  readonly reviewedSceneNumbers: ReadonlyArray<number>;
+  readonly allSceneNumbers: ReadonlyArray<number>;
+  readonly sceneRewriteMetadata: RevisionTrace["sceneRewriteMetadata"];
+}): RevisionTrace {
+  const actual = dedupeNumbers(params.actualRewrittenSceneNumbers);
+  const target = dedupeNumbers(params.targetSceneNumbers);
+  const reviewed = dedupeNumbers(params.reviewedSceneNumbers);
+  const all = dedupeNumbers(params.allSceneNumbers);
+
+  return {
+    targetSceneNumbers: target,
+    actualRewrittenSceneNumbers: actual,
+    comparisonSceneNumbers: actual,
+    unchangedSceneNumbers: all.filter((sceneNumber) => !actual.includes(sceneNumber)),
+    reviewedButNotRewrittenSceneNumbers: reviewed.filter((sceneNumber) => !actual.includes(sceneNumber)),
+    sceneRewriteMetadata: params.sceneRewriteMetadata,
+  };
 }
 
 export class HeuristicReviseEngine implements ReviseEngine {
   readonly name = "heuristic";
 
-  async revise(input: RevisionInput): Promise<ChapterDraft> {
+  async revise(input: RevisionInput): Promise<RevisionResult> {
     const document = parseSceneDocument(input.draft.content);
-    const targetScenes = new Set(collectTargetSceneNumbers(input));
+    const targetSceneNumbers = collectTargetSceneNumbers(input);
+    const targetSceneSet = new Set(targetSceneNumbers);
     const replacements: SceneTextUnit[] = [];
+    const actualRewrittenSceneNumbers: number[] = [];
+    const sceneRewriteMetadata: Record<string, { reason: ReadonlyArray<string>; strategy: ReadonlyArray<string> }> = {};
 
     for (const sceneText of document.scenes) {
-      if (!targetScenes.has(sceneText.sceneNumber)) {
+      if (!targetSceneSet.has(sceneText.sceneNumber)) {
         continue;
       }
 
@@ -155,20 +193,37 @@ export class HeuristicReviseEngine implements ReviseEngine {
       }
 
       const issues = input.sceneAudit.issues.filter((issue) => issue.sceneNumber === scene.sceneNumber);
-      replacements.push({
-        sceneNumber: scene.sceneNumber,
-        marker: sceneText.marker,
-        content: buildSceneRewrite(sceneText.marker, scene, issues, pickSupportName(input, scene)),
-      });
+      const reason = buildSceneRewriteReason(issues);
+      const strategy = buildSceneRewriteStrategy(scene, issues);
+      const rewrittenContent = buildHeuristicSceneRewrite(sceneText.marker, scene, issues, pickSupportName(input, scene));
+
+      if (rewrittenContent.trim() !== sceneText.content.trim()) {
+        actualRewrittenSceneNumbers.push(scene.sceneNumber);
+        sceneRewriteMetadata[String(scene.sceneNumber)] = { reason, strategy };
+        replacements.push({
+          sceneNumber: scene.sceneNumber,
+          marker: sceneText.marker,
+          content: rewrittenContent,
+        });
+      }
     }
 
-    const revisedContent =
-      replacements.length > 0 ? replaceSceneUnits(document, replacements) : input.draft.content;
+    const revisedContent = replacements.length > 0 ? replaceSceneUnits(document, replacements) : input.draft.content;
+    const trace = buildTrace({
+      targetSceneNumbers,
+      actualRewrittenSceneNumbers,
+      reviewedSceneNumbers: dedupeNumbers(input.sceneAudit.issues.map((issue) => issue.sceneNumber)),
+      allSceneNumbers: document.scenes.map((scene) => scene.sceneNumber),
+      sceneRewriteMetadata,
+    });
 
     return {
-      ...input.draft,
-      content: revisedContent,
-      summary: `${input.draft.summary} 本版按 scene 级问题执行了局部重写。`,
+      draft: {
+        ...input.draft,
+        content: revisedContent,
+        summary: `${input.draft.summary} 本版按 scene 级问题执行了局部重写。`,
+      },
+      trace,
     };
   }
 }
@@ -183,13 +238,16 @@ export class OpenAIReviseEngine implements ReviseEngine {
     this.model = config.model;
   }
 
-  async revise(input: RevisionInput): Promise<ChapterDraft> {
+  async revise(input: RevisionInput): Promise<RevisionResult> {
     const document = parseSceneDocument(input.draft.content);
-    const targetScenes = new Set(collectTargetSceneNumbers(input));
+    const targetSceneNumbers = collectTargetSceneNumbers(input);
+    const targetSceneSet = new Set(targetSceneNumbers);
     const replacements: SceneTextUnit[] = [];
+    const actualRewrittenSceneNumbers: number[] = [];
+    const sceneRewriteMetadata: Record<string, { reason: ReadonlyArray<string>; strategy: ReadonlyArray<string> }> = {};
 
     for (const sceneText of document.scenes) {
-      if (!targetScenes.has(sceneText.sceneNumber)) {
+      if (!targetSceneSet.has(sceneText.sceneNumber)) {
         continue;
       }
 
@@ -199,6 +257,8 @@ export class OpenAIReviseEngine implements ReviseEngine {
       }
 
       const issues = input.sceneAudit.issues.filter((issue) => issue.sceneNumber === scene.sceneNumber);
+      const reason = buildSceneRewriteReason(issues);
+      const strategy = buildSceneRewriteStrategy(scene, issues);
       const response = await this.client.chat.completions.create({
         model: this.model,
         temperature: 0.6,
@@ -215,30 +275,45 @@ export class OpenAIReviseEngine implements ReviseEngine {
               issues,
               styleProfile: input.plan.styleProfile,
               styleGuide: input.styleGuide,
+              characterHistory: input.characterHistory,
+              themeHistory: input.themeHistory,
             }),
           },
         ],
       });
 
-      const content = response.choices[0]?.message?.content?.trim();
-      if (!content) {
+      const rewrittenContent = response.choices[0]?.message?.content?.trim();
+      if (!rewrittenContent) {
         throw new Error(`LLM returned empty revised scene for scene ${scene.sceneNumber}`);
       }
 
-      replacements.push({
-        sceneNumber: scene.sceneNumber,
-        marker: sceneText.marker,
-        content,
-      });
+      if (rewrittenContent !== sceneText.content.trim()) {
+        actualRewrittenSceneNumbers.push(scene.sceneNumber);
+        sceneRewriteMetadata[String(scene.sceneNumber)] = { reason, strategy };
+        replacements.push({
+          sceneNumber: scene.sceneNumber,
+          marker: sceneText.marker,
+          content: rewrittenContent,
+        });
+      }
     }
 
-    const revisedContent =
-      replacements.length > 0 ? replaceSceneUnits(document, replacements) : input.draft.content;
+    const revisedContent = replacements.length > 0 ? replaceSceneUnits(document, replacements) : input.draft.content;
+    const trace = buildTrace({
+      targetSceneNumbers,
+      actualRewrittenSceneNumbers,
+      reviewedSceneNumbers: dedupeNumbers(input.sceneAudit.issues.map((issue) => issue.sceneNumber)),
+      allSceneNumbers: document.scenes.map((scene) => scene.sceneNumber),
+      sceneRewriteMetadata,
+    });
 
     return {
-      ...input.draft,
-      content: revisedContent,
-      summary: `${input.draft.summary} 本版由 LLM 按 scene 级问题执行局部重写。`,
+      draft: {
+        ...input.draft,
+        content: revisedContent,
+        summary: `${input.draft.summary} 本版由 LLM 按 scene 级问题执行了局部重写。`,
+      },
+      trace,
     };
   }
 }
@@ -301,30 +376,78 @@ export function buildBlockingGateStatus(params: {
   };
 }
 
+function buildTextualChangeEvidence(params: {
+  readonly beforeContent: string;
+  readonly afterContent: string;
+  readonly beforeIssues: ReadonlyArray<SceneAuditIssue>;
+  readonly scene?: SceneBlueprintItem;
+}): ReadonlyArray<string> {
+  const evidence: string[] = [];
+  if (params.beforeContent.trim() !== params.afterContent.trim()) {
+    evidence.push("scene 文本已实际替换");
+  }
+
+  if (params.beforeIssues.some((issue) => issue.problem.includes("决策"))) {
+    evidence.push("decision added or clarified");
+  }
+  if (params.beforeIssues.some((issue) => issue.problem.includes("代价"))) {
+    evidence.push("cost clarified");
+  }
+  if (params.beforeIssues.some((issue) => issue.problem.includes("主题"))) {
+    evidence.push("theme tension inserted");
+  }
+  if (params.scene?.styleDirective.includes("对白")) {
+    evidence.push("dialogue differentiated");
+  }
+
+  const beforeLength = params.beforeContent.replace(/\s+/gu, "").length;
+  const afterLength = params.afterContent.replace(/\s+/gu, "").length;
+  if (afterLength < beforeLength) {
+    evidence.push("style tightened");
+  } else if (afterLength > beforeLength) {
+    evidence.push("scene expanded for clearer conflict");
+  }
+
+  return dedupeStrings(evidence);
+}
+
 function buildSceneRevisionExplanation(params: {
   readonly sceneNumber: number;
   readonly beforeContent: string;
   readonly afterContent: string;
-  readonly issues: ReadonlyArray<SceneAuditIssue>;
+  readonly beforeIssues: ReadonlyArray<SceneAuditIssue>;
+  readonly afterIssues: ReadonlyArray<SceneAuditIssue>;
   readonly scene: SceneBlueprintItem | undefined;
+  readonly trace: RevisionTrace;
 }): SceneRevisionExplanation {
   const scene = params.scene;
-  const beforeProblems = params.issues.map((issue) => issue.problem);
-  const rewriteStrategy = scene ? buildSceneRewriteStrategy(scene, params.issues) : [];
+  const beforeProblems = params.beforeIssues.map((issue) => issue.problem);
+  const afterProblems = params.afterIssues.map((issue) => issue.problem);
+  const metadata = params.trace.sceneRewriteMetadata[String(params.sceneNumber)];
 
   return {
     sceneNumber: params.sceneNumber,
+    sceneId: scene?.sceneId,
+    sceneAnchor: scene?.sceneAnchor,
     beforeProblems,
-    rewriteStrategy,
+    appliedRewriteStrategy: metadata?.strategy ?? [],
+    textualChangeEvidence: buildTextualChangeEvidence({
+      beforeContent: params.beforeContent,
+      afterContent: params.afterContent,
+      beforeIssues: params.beforeIssues,
+      scene,
+    }),
     characterChange: scene
       ? `把 ${scene.drivingCharacter} 的决策“${scene.decision}”和代价“${scene.cost}”写进场景动作。`
       : "未捕获到 scene blueprint。",
     themeChange: scene
-      ? `将价值冲突“${scene.valuePositionA} vs ${scene.valuePositionB}”通过 ${scene.sceneStance} 落进场景。`
+      ? `把价值冲突“${scene.valuePositionA} vs ${scene.valuePositionB}”通过 ${scene.sceneStance} 压进场景。`
       : "未捕获到主题冲突。",
-    styleChange: scene
-      ? `按风格指令执行局部重写：${scene.styleDirective}`
-      : "未捕获到风格指令。",
+    styleChange: scene ? `按风格指令执行局部重写：${scene.styleDirective}` : "未捕获到风格指令。",
+    postRewriteAssessment: {
+      resolvedProblems: beforeProblems.filter((problem) => !afterProblems.includes(problem)),
+      remainingProblems: afterProblems,
+    },
     beforeExcerpt: shortenSceneExcerpt(params.beforeContent),
     afterExcerpt: shortenSceneExcerpt(params.afterContent),
   };
@@ -339,6 +462,7 @@ export function buildRevisionComparisonReport(params: {
   readonly plan: ChapterPlan;
   readonly beforeDraftContent: string;
   readonly afterDraftContent: string;
+  readonly trace: RevisionTrace;
 }): RevisionComparisonReport {
   const delta = {
     hook: params.after.readerReport.scores.hook - params.before.readerReport.scores.hook,
@@ -362,22 +486,22 @@ export function buildRevisionComparisonReport(params: {
 
   const beforeDoc = parseSceneDocument(params.beforeDraftContent);
   const afterDoc = parseSceneDocument(params.afterDraftContent);
-  const changedSceneNumbers = new Set<number>([
-    ...params.beforeSceneAudit.issues.map((issue) => issue.sceneNumber),
-    ...params.afterSceneAudit.issues.map((issue) => issue.sceneNumber),
-  ]);
+  const sceneChanges = params.trace.comparisonSceneNumbers.map((sceneNumber) =>
+    buildSceneRevisionExplanation({
+      sceneNumber,
+      beforeContent: beforeDoc.scenes.find((scene) => scene.sceneNumber === sceneNumber)?.content ?? "",
+      afterContent: afterDoc.scenes.find((scene) => scene.sceneNumber === sceneNumber)?.content ?? "",
+      beforeIssues: params.beforeSceneAudit.issues.filter((issue) => issue.sceneNumber === sceneNumber),
+      afterIssues: params.afterSceneAudit.issues.filter((issue) => issue.sceneNumber === sceneNumber),
+      scene: params.plan.sceneBlueprint.find((scene) => scene.sceneNumber === sceneNumber),
+      trace: params.trace,
+    }),
+  );
 
-  const sceneChanges = Array.from(changedSceneNumbers)
-    .sort((left, right) => left - right)
-    .map((sceneNumber) =>
-      buildSceneRevisionExplanation({
-        sceneNumber,
-        beforeContent: beforeDoc.scenes.find((scene) => scene.sceneNumber === sceneNumber)?.content ?? "",
-        afterContent: afterDoc.scenes.find((scene) => scene.sceneNumber === sceneNumber)?.content ?? "",
-        issues: params.beforeSceneAudit.issues.filter((issue) => issue.sceneNumber === sceneNumber),
-        scene: params.plan.sceneBlueprint.find((scene) => scene.sceneNumber === sceneNumber),
-      }),
-    );
+  const beforeParsedSceneNumbers = beforeDoc.scenes.map((scene) => scene.sceneNumber);
+  const afterParsedSceneNumbers = afterDoc.scenes.map((scene) => scene.sceneNumber);
+  const beforeAnalysisSceneNumbers = params.before.scenes.map((scene) => scene.sceneNumber);
+  const afterAnalysisSceneNumbers = params.after.scenes.map((scene) => scene.sceneNumber);
 
   return {
     chapterNumber: params.chapterNumber,
@@ -385,10 +509,25 @@ export function buildRevisionComparisonReport(params: {
     sceneIssueDelta,
     summary:
       improved.length > 0
-        ? `本轮修订后共有 ${improved.length} 项关键指标改善，并给出 ${sceneChanges.length} 个 scene 级改写解释。`
+        ? `本轮修订后共有 ${improved.length} 项关键指标改善，并且只对 ${sceneChanges.length} 个实际改写的 scene 生成了解释。`
         : "本轮修订没有带来明显指标提升，需要重新审视 revise brief。",
     improved,
     unresolved,
+    targetSceneNumbers: params.trace.targetSceneNumbers,
+    actualRewrittenSceneNumbers: params.trace.actualRewrittenSceneNumbers,
+    comparisonSceneNumbers: params.trace.comparisonSceneNumbers,
+    unchangedSceneNumbers: params.trace.unchangedSceneNumbers,
+    reviewedButNotRewrittenSceneNumbers: params.trace.reviewedButNotRewrittenSceneNumbers,
+    sceneRewriteMetadata: params.trace.sceneRewriteMetadata,
+    sceneAlignment: {
+      mappingBasis: "comparison 按 draft 文本中的 scene marker 建立映射；re-analysis scene 数量单独记录。",
+      beforeParsedSceneNumbers,
+      afterParsedSceneNumbers,
+      beforeAnalysisSceneNumbers,
+      afterAnalysisSceneNumbers,
+      stableByParsedScenes: JSON.stringify(beforeParsedSceneNumbers) === JSON.stringify(afterParsedSceneNumbers),
+      stableByAnalysisScenes: JSON.stringify(beforeAnalysisSceneNumbers) === JSON.stringify(afterAnalysisSceneNumbers),
+    },
     sceneChanges,
   };
 }

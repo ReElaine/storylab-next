@@ -1,9 +1,22 @@
 import type { ScenePlanItem } from "../types.js";
+import { parseSceneDocument } from "../utils/scene-text.js";
 import { splitParagraphs } from "../utils/text.js";
+
+function buildSceneIdentity(sceneNumber: number, pov: string): Pick<ScenePlanItem, "sceneId" | "sceneAnchor"> {
+  return {
+    sceneId: `scene-${sceneNumber}`,
+    sceneAnchor: `scene-${sceneNumber}-${pov}`,
+  };
+}
+
+function extractPovFromMarker(marker: string): string | null {
+  const match = marker.match(/POV[:：]([^\]】\n]+)/u);
+  return match?.[1]?.trim() ?? null;
+}
 
 function inferPov(paragraphs: ReadonlyArray<string>): string {
   const joined = paragraphs.join("\n");
-  if (joined.includes("林炽")) return "林炽";
+  if (joined.includes("林烬")) return "林烬";
   if (joined.includes("沈砚")) return "沈砚";
   return "未明";
 }
@@ -15,13 +28,13 @@ function inferGoal(text: string): string {
 }
 
 function inferConflict(text: string): string {
-  if (text.includes("代价") || text.includes("失控")) return "目标与代价正面冲撞";
-  if (text.includes("不")) return "角色意图受到阻力";
+  if (text.includes("代价") || text.includes("失控")) return "目标与代价正面碰撞";
+  if (text.includes("阻")) return "角色意图受到阻力";
   return "信息不足制造阻力";
 }
 
 function inferTurn(text: string): string {
-  if (text.includes("却") || text.includes("但是") || text.includes("可")) return "场景中段出现逆转";
+  if (text.includes("却") || text.includes("但是") || text.includes("可是")) return "场景中段出现逆转";
   return "场景以内压推进，没有明显反转";
 }
 
@@ -44,27 +57,55 @@ function inferEmotion(text: string): string {
   return "紧张逐步上升";
 }
 
+function planFromParagraphChunks(chapterText: string): ReadonlyArray<ScenePlanItem> {
+  const paragraphs = splitParagraphs(chapterText).filter((entry) => !entry.startsWith("#"));
+  const scenes: ScenePlanItem[] = [];
+
+  for (let index = 0; index < paragraphs.length; index += 3) {
+    const chunk = paragraphs.slice(index, index + 3);
+    const joined = chunk.join("\n");
+    const sceneNumber = scenes.length + 1;
+    const pov = inferPov(chunk);
+    scenes.push({
+      ...buildSceneIdentity(sceneNumber, pov),
+      sceneNumber,
+      pov,
+      goal: inferGoal(joined),
+      conflict: inferConflict(joined),
+      turn: inferTurn(joined),
+      result: inferResult(joined),
+      newInformation: extractNewInformation(joined),
+      emotionalShift: inferEmotion(joined),
+      sourceParagraphs: chunk,
+    });
+  }
+
+  return scenes;
+}
+
 export class ScenePlanner {
   plan(chapterText: string): ReadonlyArray<ScenePlanItem> {
-    const paragraphs = splitParagraphs(chapterText).filter((entry) => !entry.startsWith("#"));
-    const scenes: ScenePlanItem[] = [];
+    const parsed = parseSceneDocument(chapterText);
+    if (parsed.scenes.length === 0) {
+      return planFromParagraphChunks(chapterText);
+    }
 
-    for (let index = 0; index < paragraphs.length; index += 3) {
-      const chunk = paragraphs.slice(index, index + 3);
-      const joined = chunk.join("\n");
-      scenes.push({
-        sceneNumber: scenes.length + 1,
-        pov: inferPov(chunk),
+    return parsed.scenes.map((scene) => {
+      const paragraphs = splitParagraphs(scene.content).filter((entry) => !entry.startsWith("【场景"));
+      const joined = paragraphs.join("\n");
+      const pov = extractPovFromMarker(scene.marker) ?? inferPov(paragraphs);
+      return {
+        ...buildSceneIdentity(scene.sceneNumber, pov),
+        sceneNumber: scene.sceneNumber,
+        pov,
         goal: inferGoal(joined),
         conflict: inferConflict(joined),
         turn: inferTurn(joined),
         result: inferResult(joined),
         newInformation: extractNewInformation(joined),
         emotionalShift: inferEmotion(joined),
-        sourceParagraphs: chunk,
-      });
-    }
-
-    return scenes;
+        sourceParagraphs: paragraphs,
+      };
+    });
   }
 }

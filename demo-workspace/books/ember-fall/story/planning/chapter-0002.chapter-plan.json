@@ -4,12 +4,14 @@
   "readerGoal": "让读者同时获得推进感、代价感和明确的追读钩子。",
   "sceneBlueprint": [
     {
+      "sceneId": "scene-1",
+      "sceneAnchor": "scene-1-林炽",
       "sceneNumber": 1,
       "pov": "林炽",
       "goal": "林炽试图主动推进当前悬念",
       "conflict": "沈砚让目标必须伴随代价",
       "turn": "林炽意识到当前误判正在放大风险",
-      "result": "林炽被迫继续追进，而不是原地观望",
+      "result": "林炽被迫继续推进，而不是原地观望",
       "newInformation": [
         "上一章遗留的问题出现了更具体的新解释"
       ],
@@ -19,13 +21,15 @@
       "decision": "林炽必须决定是继续推进，还是暂时后撤",
       "cost": "林炽一旦继续推进，就要先付出 身体代价已经显性出现",
       "relationshipChange": "林炽与沈砚从试探进入高压协作",
-      "thematicTension": "代价与亲密 对 力量可以无损获得",
+      "thematicTension": "代价与亲密 vs 力量可以无损获得",
       "valuePositionA": "代价与亲密",
       "valuePositionB": "力量可以无损获得",
       "sceneStance": "先压向 代价与亲密",
       "styleDirective": "叙述遵循“近距离第三人称，压迫感强，少解释，多让动作和环境渗出情绪”，节奏按“短句推进冲突，中句承接信息，长句只用于情绪波峰前后”推进"
     },
     {
+      "sceneId": "scene-2",
+      "sceneAnchor": "scene-2-林炽",
       "sceneNumber": 2,
       "pov": "林炽",
       "goal": "让 林炽 做出一次无法完全回撤的选择",
@@ -48,11 +52,13 @@
       "styleDirective": "对白必须体现“对白必须区分人物策略，不允许所有角色说话一个腔调”，避免所有角色说话同质化"
     },
     {
+      "sceneId": "scene-3",
+      "sceneAnchor": "scene-3-林炽",
       "sceneNumber": 3,
       "pov": "林炽",
       "goal": "把章节推到一个更强的尾钩",
       "conflict": "代价与亲密 与 力量可以无损获得 正面碰撞",
-      "turn": "一个关键事实让人物意识到代价已经开始兑现",
+      "turn": "一个关键信息让角色意识到代价已经开始兑现",
       "result": "留下一个必须进入下一章解决的问题",
       "newInformation": [
         "主题冲突第一次以不可回避的方式显形"
@@ -78,7 +84,7 @@
     },
     {
       "name": "沈砚",
-      "desiredMovement": "沈砚要成为压力源，迫使主角色面对真实代价",
+      "desiredMovement": "沈砚要成为压力源，逼使主角面对真实代价",
       "costPressure": "身体代价已经显性出现"
     }
   ],

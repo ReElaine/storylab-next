@@ -26,6 +26,13 @@ function buildStyleProfile(guide: StyleGuide): StyleProfile {
   };
 }
 
+function buildSceneIdentity(sceneNumber: number, pov: string): Pick<SceneBlueprintItem, "sceneId" | "sceneAnchor"> {
+  return {
+    sceneId: `scene-${sceneNumber}`,
+    sceneAnchor: `scene-${sceneNumber}-${pov}`,
+  };
+}
+
 function buildSceneBlueprint(
   characterHistory: ReadonlyArray<CharacterHistory>,
   themeHistory: ThemeHistory,
@@ -42,12 +49,13 @@ function buildSceneBlueprint(
 
   return [
     {
+      ...buildSceneIdentity(1, leadName),
       sceneNumber: 1,
       pov: leadName,
       goal: `${leadName}试图主动推进当前悬念`,
       conflict: `${opposingName}让目标必须伴随代价`,
       turn: `${leadName}意识到当前误判正在放大风险`,
-      result: `${leadName}被迫继续追进，而不是原地观望`,
+      result: `${leadName}被迫继续推进，而不是原地观望`,
       newInformation: ["上一章遗留的问题出现了更具体的新解释"],
       emotionalShift: "试探 -> 紧张",
       drivingCharacter: leadName,
@@ -55,13 +63,14 @@ function buildSceneBlueprint(
       decision: `${leadName}必须决定是继续推进，还是暂时后撤`,
       cost: `${leadName}一旦继续推进，就要先付出 ${lead?.decisionCost ?? "明确代价"}`,
       relationshipChange: `${leadName}与${opposingName}从试探进入高压协作`,
-      thematicTension: `${theme} 对 ${antiTheme}`,
+      thematicTension: `${theme} vs ${antiTheme}`,
       valuePositionA: theme,
       valuePositionB: antiTheme,
       sceneStance: `先压向 ${theme}`,
       styleDirective: `叙述遵循“${styleProfile.narrationStyle}”，节奏按“${styleProfile.pacingProfile}”推进`,
     },
     {
+      ...buildSceneIdentity(2, leadName),
       sceneNumber: 2,
       pov: leadName,
       goal: `让 ${leadName} 做出一次无法完全回撤的选择`,
@@ -82,11 +91,12 @@ function buildSceneBlueprint(
       styleDirective: `对白必须体现“${styleProfile.dialogueStyle}”，避免所有角色说话同质化`,
     },
     {
+      ...buildSceneIdentity(3, leadName),
       sceneNumber: 3,
       pov: leadName,
       goal: "把章节推到一个更强的尾钩",
       conflict: `${theme} 与 ${antiTheme} 正面碰撞`,
-      turn: "一个关键事实让人物意识到代价已经开始兑现",
+      turn: "一个关键信息让角色意识到代价已经开始兑现",
       result: "留下一个必须进入下一章解决的问题",
       newInformation: ["主题冲突第一次以不可回避的方式显形"],
       emotionalShift: "压迫 -> 失衡",
@@ -113,9 +123,7 @@ export class ChapterPlanner {
     gates: ReadonlyArray<HumanGate>,
     styleGuide: StyleGuide,
   ): ChapterPlan {
-    const presentCharacters = characterHistory
-      .filter((entry) => entry.latestState.presentInChapter)
-      .slice(0, 3);
+    const presentCharacters = characterHistory.filter((entry) => entry.latestState.presentInChapter).slice(0, 3);
     const latestTheme = themeHistory.timeline[themeHistory.timeline.length - 1];
     const nextGate = gates.find((gate) => gate.triggerChapter === targetChapterNumber);
     const styleProfile = buildStyleProfile(styleGuide);
@@ -133,7 +141,7 @@ export class ChapterPlanner {
         desiredMovement:
           index === 0
             ? `${entry.name}要在本章做出关键选择，并被其误判拖向更危险的结果`
-            : `${entry.name}要成为压力源，迫使主角色面对真实代价`,
+            : `${entry.name}要成为压力源，逼使主角面对真实代价`,
         costPressure: entry.latestState.decisionCost,
       })),
       themeIntent: latestTheme
