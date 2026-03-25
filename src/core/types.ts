@@ -148,17 +148,22 @@ export interface StoryMemory {
   };
 }
 
+export interface SceneBlueprintItem {
+  readonly sceneNumber: number;
+  readonly pov: string;
+  readonly goal: string;
+  readonly conflict: string;
+  readonly turn: string;
+  readonly result: string;
+  readonly newInformation: ReadonlyArray<string>;
+  readonly emotionalShift: string;
+}
+
 export interface ChapterPlan {
   readonly targetChapterNumber: number;
   readonly chapterMission: string;
   readonly readerGoal: string;
-  readonly sceneBlueprint: ReadonlyArray<{
-    readonly sceneNumber: number;
-    readonly objective: string;
-    readonly tension: string;
-    readonly reveal: string;
-    readonly endingBeat: string;
-  }>;
+  readonly sceneBlueprint: ReadonlyArray<SceneBlueprintItem>;
   readonly characterIntent: ReadonlyArray<{
     readonly name: string;
     readonly desiredMovement: string;
@@ -212,6 +217,33 @@ export interface DraftReviewArtifacts {
   readonly revisionBriefPath: string;
 }
 
+export interface SceneAuditIssue {
+  readonly sceneNumber: number;
+  readonly severity: "low" | "medium" | "high";
+  readonly problem: string;
+  readonly recommendation: string;
+}
+
+export interface SceneAuditReport {
+  readonly sceneCoverageOk: boolean;
+  readonly issues: ReadonlyArray<SceneAuditIssue>;
+}
+
+export interface RevisionComparisonReport {
+  readonly chapterNumber: number;
+  readonly readerScoreDelta: {
+    readonly hook: number;
+    readonly momentum: number;
+    readonly emotionalPeak: number;
+    readonly suspense: number;
+    readonly memorability: number;
+  };
+  readonly sceneIssueDelta: number;
+  readonly summary: string;
+  readonly improved: ReadonlyArray<string>;
+  readonly unresolved: ReadonlyArray<string>;
+}
+
 export interface StorylabDraftCycleResult {
   readonly bookId: string;
   readonly chapterNumber: number;
@@ -219,4 +251,15 @@ export interface StorylabDraftCycleResult {
   readonly provider: string;
   readonly reviewPath: string;
   readonly revisionBriefPath: string;
+}
+
+export interface StorylabRevisionCycleResult {
+  readonly bookId: string;
+  readonly chapterNumber: number;
+  readonly initialDraftPath: string;
+  readonly revisedDraftPath: string;
+  readonly reviewPath: string;
+  readonly revisedReviewPath: string;
+  readonly comparisonPath: string;
+  readonly provider: string;
 }

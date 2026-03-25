@@ -58,6 +58,7 @@ node dist/index.js run ./demo-workspace ember-fall 1
 node dist/index.js plan-next ./demo-workspace ember-fall 2
 node dist/index.js draft-from-plan ./demo-workspace ember-fall 2
 node dist/index.js draft-cycle ./demo-workspace ember-fall 2
+node dist/index.js revise-cycle ./demo-workspace ember-fall 2
 ```
 
 ## 输出目录
@@ -131,7 +132,10 @@ STORYLAB_OPENAI_BASE_URL=https://your-compatible-endpoint/v1
 ## 文档
 
 - [架构分析](./docs/architecture-analysis.md)
+- [Inkos 借鉴映射表](./docs/inkos-mapping.md)
 - [详细设计](./docs/design.md)
 - [使用说明](./docs/usage.md)
+- [调用链说明](./docs/call-flows.md)
+- [修订闭环](./docs/revision-loop.md)
 - [路线图](./docs/roadmap.md)
 - [阶段进展评审包](./docs/progress-review.md)

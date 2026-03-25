@@ -1,17 +1,18 @@
 {
-  "lastAnalyzedChapter": 1,
+  "lastAnalyzedChapter": 2,
   "activeHooks": [
     "代价与亲密仍在推进"
   ],
   "unresolvedRisks": [
     "林炽: 身体代价已经显性出现",
     "沈砚: 身体代价已经显性出现",
+    "痛感到了，但情绪峰值还可以再抬高一层",
     "林炽: 身体代价已经显性出现",
     "沈砚: 身体代价已经显性出现"
   ],
   "readerTrajectory": {
-    "averageHookScore": 8,
-    "averageMomentumScore": 9,
-    "averageEmotionalPeakScore": 7
+    "averageHookScore": 7,
+    "averageMomentumScore": 9.5,
+    "averageEmotionalPeakScore": 5
   }
 }

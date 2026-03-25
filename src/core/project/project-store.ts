@@ -89,6 +89,8 @@ export class ProjectStore {
       mkdir(join(storyDir, "themes"), { recursive: true }),
       mkdir(join(storyDir, "reviews"), { recursive: true }),
       mkdir(join(storyDir, "reviews", "drafts"), { recursive: true }),
+      mkdir(join(storyDir, "reviews", "revisions"), { recursive: true }),
+      mkdir(join(storyDir, "revisions"), { recursive: true }),
       mkdir(join(storyDir, "style"), { recursive: true }),
       mkdir(join(storyDir, "human-gates"), { recursive: true }),
       mkdir(join(storyDir, "planning"), { recursive: true }),
@@ -139,8 +141,18 @@ export class ProjectStore {
   async writeDraft(bookId: string, draft: ChapterDraft): Promise<string> {
     const draftsDir = join(this.bookDir(bookId), "drafts");
     await mkdir(draftsDir, { recursive: true });
-    const fileName = `${String(draft.chapterNumber).padStart(4, "0")}_${this.sanitizeFileName(draft.title)}.md`;
-    const path = join(draftsDir, fileName);
+    return this.writeDraftFile(draftsDir, draft, "");
+  }
+
+  async writeRevisedDraft(bookId: string, draft: ChapterDraft): Promise<string> {
+    const revisionsDir = join(this.bookDir(bookId), "drafts", "revised");
+    await mkdir(revisionsDir, { recursive: true });
+    return this.writeDraftFile(revisionsDir, draft, ".revised");
+  }
+
+  private async writeDraftFile(baseDir: string, draft: ChapterDraft, suffix: string): Promise<string> {
+    const fileName = `${String(draft.chapterNumber).padStart(4, "0")}_${this.sanitizeFileName(draft.title)}${suffix}.md`;
+    const path = join(baseDir, fileName);
     const markdown = [
       `# 第${draft.chapterNumber}章 ${draft.title}`,
       "",

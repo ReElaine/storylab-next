@@ -124,6 +124,21 @@ node dist/index.js draft-cycle ./demo-workspace ember-fall 2
 - 对草稿再次执行 `reader / character / theme / style / gate` 分析
 - 输出草稿评审结果与草稿修订 brief
 
+### 7. 执行完整修订闭环
+
+```bash
+node dist/index.js revise-cycle ./demo-workspace ember-fall 2
+```
+
+作用：
+
+- 生成初始草稿
+- 对初始草稿做 analysis 与 scene audit
+- 根据 revision brief 和 scene audit 执行 revise
+- 对修订后版本重新 analysis
+- 输出 before / after comparison
+- 将修订后结果写回 history 与 memory
+
 ## 关键输出文件
 
 ### 单章输出
@@ -155,6 +170,13 @@ node dist/index.js draft-cycle ./demo-workspace ember-fall 2
 - `story/reviews/drafts/chapter-0002.draft-review.json`
 - `story/reviews/drafts/chapter-0002.draft-revision-brief.md`
 
+### 修订闭环输出
+
+- `drafts/revised/0002_xxx.revised.md`
+- `story/reviews/revisions/chapter-0002.revised-review.json`
+- `story/reviews/revisions/chapter-0002.revised-revision-brief.md`
+- `story/revisions/chapter-0002.comparison.json`
+
 ## 推荐工作方式
 
 当前推荐流程：
@@ -168,7 +190,8 @@ node dist/index.js draft-cycle ./demo-workspace ember-fall 2
 7. 跑 `plan-next` 生成下一章计划
 8. 跑 `draft-from-plan` 生成草稿
 9. 跑 `draft-cycle` 形成草稿评审闭环
-10. 再进入下一轮写作或修订
+10. 跑 `revise-cycle` 执行修订闭环
+11. 再进入下一轮写作或修订
 
 ## 已知限制
 

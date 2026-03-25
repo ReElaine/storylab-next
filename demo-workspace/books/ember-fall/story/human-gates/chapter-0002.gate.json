@@ -1,0 +1,11 @@
+{
+  "chapterNumber": 2,
+  "gate": {
+    "key": "early-arc",
+    "label": "前三章检查",
+    "triggerChapter": 3,
+    "purpose": "确认钩子兑现速度、人物关系和主题方向"
+  },
+  "required": false,
+  "rationale": "下一个人工介入点在第 3 章：前三章检查"
+}
