@@ -160,7 +160,9 @@ export class StorylabRunner {
     const sceneAudit = this.sceneAuditor.audit(plan.sceneBlueprint, analysis.scenes);
     const blockingGate = buildBlockingGateStatus({ analysis, sceneAudit });
     if (blockingGate.blocking && !override) {
-      throw new Error(`Blocking gate triggered: ${blockingGate.reasons.join("; ")}. Re-run with --override to continue.`);
+      throw new Error(
+        `Blocking gate triggered: ${blockingGate.reasons.join("; ")}. Blocking scenes: ${blockingGate.blockingScenes.map((entry) => `${entry.sceneNumber}(${entry.issueTypes.join(", ")})`).join("; ")}. Re-run with --override to continue.`,
+      );
     }
     const reviewArtifacts = await this.writeDraftReviewArtifacts(bookId, targetChapterNumber, book, analysis, sceneAudit);
 
@@ -215,7 +217,9 @@ export class StorylabRunner {
     const beforeSceneAudit = this.sceneAuditor.audit(plan.sceneBlueprint, beforeAnalysis.scenes);
     const blockingGate = buildBlockingGateStatus({ analysis: beforeAnalysis, sceneAudit: beforeSceneAudit });
     if (blockingGate.blocking && !override) {
-      throw new Error(`Blocking gate triggered: ${blockingGate.reasons.join("; ")}. Re-run with --override to continue.`);
+      throw new Error(
+        `Blocking gate triggered: ${blockingGate.reasons.join("; ")}. Blocking scenes: ${blockingGate.blockingScenes.map((entry) => `${entry.sceneNumber}(${entry.issueTypes.join(", ")})`).join("; ")}. Re-run with --override to continue.`,
+      );
     }
     const beforeArtifacts = await this.writeDraftReviewArtifacts(
       bookId,
@@ -233,6 +237,10 @@ export class StorylabRunner {
       characterHistory: previousCharacterHistory,
       themeHistory: previousThemeHistory,
       styleGuide,
+      targetSceneNumbers:
+        blockingGate.blockingScenes.length > 0
+          ? blockingGate.blockingScenes.map((entry) => entry.sceneNumber)
+          : beforeSceneAudit.issues.map((issue) => issue.sceneNumber),
     });
     const revisedDraftPath = await this.store.writeRevisedDraft(bookId, revisedDraft);
 
@@ -259,6 +267,9 @@ export class StorylabRunner {
       after: afterAnalysis,
       beforeSceneAudit,
       afterSceneAudit,
+      plan,
+      beforeDraftContent: beforeDraft.content,
+      afterDraftContent: revisedDraft.content,
     });
     const comparisonPath = await this.store.writeOutput(
       bookId,

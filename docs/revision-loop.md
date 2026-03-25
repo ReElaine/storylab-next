@@ -1,20 +1,28 @@
 # storylab-next 修订闭环设计
 
-这份文档说明当前项目中真正会影响正文质量的修订闭环。
+这份文档只回答一个问题：
 
-目标不是“多一份报告”，而是把以下链路做实：
+`storylab-next` 的修订链路，是否已经从“输出报告”走到了“按问题改稿”。
 
-`analysis -> critique -> revision brief -> revise -> re-analysis -> persist`
+当前答案是：已经进入第一版可运行闭环，而且修订粒度开始下沉到 `scene`。
 
-## 1. 当前闭环入口
+主链如下：
 
-命令：
+`analysis -> critique -> revision brief -> scene-level revise -> re-analysis -> comparison -> persist`
+
+## 1. 命令入口
 
 ```bash
 node dist/index.js revise-cycle ./demo-workspace ember-fall 2
 ```
 
-## 2. revise-cycle 的完整过程
+如果 blocking gate 被触发，默认会中断；需要显式传入：
+
+```bash
+node dist/index.js revise-cycle ./demo-workspace ember-fall 2 --override
+```
+
+## 2. revise-cycle 的完整流程
 
 ### 第一步：准备输入
 
@@ -35,7 +43,7 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2
 
 - `draft-from-plan`
 
-然后读取初始草稿正文。
+然后读取已落盘的草稿正文。
 
 ### 第三步：首次 analysis
 
@@ -45,8 +53,8 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2
 
 输出：
 
-- scenes
-- character states
+- scene 分析
+- character state
 - theme report
 - style report
 - reader experience report
@@ -55,7 +63,7 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2
 
 ### 第四步：scene audit
 
-将：
+把：
 
 - `chapter plan.sceneBlueprint`
 - `analysis.scenes`
@@ -64,12 +72,12 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2
 
 - 是否漏写 scene
 - 是否目标失焦
-- 是否冲突不足
-- 是否转折缺失
-- 是否结果不清晰
+- 是否缺少决策
+- 是否缺少代价
+- 是否主题冲突不足
 - 是否 POV 漂移
 
-### 第五步：执行 revise
+### 第五步：scene-level revise
 
 调用：
 
@@ -77,13 +85,25 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2
 
 输入：
 
-- 原始草稿
-- chapter plan
+- 原始草稿全文
+- 章节 plan
 - analysis 结果
 - scene audit 结果
 - character history
 - theme history
 - style guide
+- `targetSceneNumbers`
+
+这里最关键的变化是：
+
+- revise 不再默认整章重写
+- 系统会优先定位有问题的 `scene`
+- 如果 blocking gate 命中，则优先只修 blocking scenes
+- 每个待修 `scene` 的输入都包含：
+  - 原 scene 文本
+  - scene blueprint
+  - 该 scene 的 critique 问题
+  - character / theme / style 约束
 
 输出：
 
@@ -94,25 +114,30 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2
 对修订后的正文再次调用：
 
 - `analysis engine`
-
-然后再次运行：
-
 - `scene auditor`
 
-### 第七步：比较 before / after
+### 第七步：comparison
 
-输出 comparison report，至少比较：
+输出 `comparison.json`，包含：
 
-- hook delta
-- momentum delta
-- emotional peak delta
-- suspense delta
-- memorability delta
+- reader score delta
 - scene issue delta
+- improved / unresolved 摘要
+- `sceneChanges`
+
+其中 `sceneChanges` 会按场景给出：
+
+- 修改前问题
+- 修改策略
+- character change
+- theme change
+- style change
+- before excerpt
+- after excerpt
 
 ### 第八步：persist
 
-将修订后的 analysis 结果重新写回：
+把修订后的 analysis 结果重新写回：
 
 - `story/scenes/`
 - `story/characters/`
@@ -132,43 +157,44 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2
 
 ## 3. 当前输出文件
 
-### 初始草稿评审
+初始草稿评审：
 
 - `story/reviews/drafts/chapter-XXXX.draft-review.json`
 - `story/reviews/drafts/chapter-XXXX.draft-revision-brief.md`
 
-### 修订后评审
+修订后评审：
 
 - `story/reviews/revisions/chapter-XXXX.revised-review.json`
 - `story/reviews/revisions/chapter-XXXX.revised-revision-brief.md`
 
-### 对比报告
+对比报告：
 
 - `story/revisions/chapter-XXXX.comparison.json`
 
-### 修订正文
+修订正文：
 
 - `drafts/revised/000X_xxx.revised.md`
 
-## 4. 当前 revise loop 已解决的问题
+## 4. 这一轮闭环真正解决了什么
 
 - 修订前后不再只是“感觉更好了”
-- 有 before/after 的结构化比较
-- 修订后结果会重新写回 history 与 memory
-- scene plan 不再只是附件，而是 revise 的硬基准之一
+- 现在有 before / after 的结构化 comparison
+- 修订后结果会写回 history 和 memory
+- scene plan 不再只是附件，而是 revise 的硬基准
+- 系统已经具备“scene 2 有问题，就优先只改 scene 2”的能力
 
-## 5. 当前 revise loop 仍然不足的地方
+## 5. 当前仍然不足的地方
 
-- heuristic revise 仍偏局部补强，不是成熟重写器
-- style control 还没有完全进入 revise 行为
-- 角色问题还没有按 scene 粒度局部重写
-- blocking gate 还未进入 revise 阶段控制
+- heuristic revise 仍偏结构化改写，不是成熟小说重写器
+- style control 还没有完全内化到所有局部重写里
+- 角色问题和主题问题虽然已进入 scene revise，但还可以更细
+- comparison 现在能解释改写方向，但还不是完整 scene diff 可视化
 
-## 6. 下一步应继续强化什么
+## 6. 下一步继续强化什么
 
-优先级建议：
+优先建议：
 
-1. 让 revise engine 更强地按 scene 定位问题
-2. 让 revise engine 能按角色问题定点重写
-3. 让 style report 直接生成 style constraints
-4. 让 revise 后的 comparison 不只比较分数，还比较问题收敛情况
+1. 让 revise engine 对角色问题的局部重写更细
+2. 让 revise engine 对主题冲突的重写更明确
+3. 让 style report 直接产出更硬的局部 style constraints
+4. 让 comparison 报告继续增强“改好在哪”的解释性

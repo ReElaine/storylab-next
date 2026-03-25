@@ -2,7 +2,7 @@
 
 这份文档用 demo 中的第 2 章说明：
 
-- 原始草稿长什么样
+- 原始草稿是什么样
 - revise 前评审指出了什么
 - revise 后增加了什么
 - 角色决策 / 主题冲突 / 风格变化分别在哪里发生
@@ -11,7 +11,7 @@
 
 原始草稿：
 
-- [drafts/0002_代价开始说话.md](/C:/Working/storylab-next/demo-workspace/books/ember-fall/drafts/0002_代价开始说话.md)
+- [0002_代价开始说话.md](/C:/Working/storylab-next/demo-workspace/books/ember-fall/drafts/0002_代价开始说话.md)
 
 revise 前评审：
 
@@ -19,108 +19,102 @@ revise 前评审：
 
 revise 后草稿：
 
-- [drafts/revised/0002_当前草稿.revised.md](/C:/Working/storylab-next/demo-workspace/books/ember-fall/drafts/revised/0002_当前草稿.revised.md)
+- [0002_当前草稿.revised.md](/C:/Working/storylab-next/demo-workspace/books/ember-fall/drafts/revised/0002_当前草稿.revised.md)
 
 comparison：
 
 - [chapter-0002.comparison.json](/C:/Working/storylab-next/demo-workspace/books/ember-fall/story/revisions/chapter-0002.comparison.json)
 
-## 2. revise 前问题
+## 2. revise 前的问题
 
-revise 前的评审已经明确指出：
+当前评审已经明确指出：
 
 - scene 1 缺少明确决策
 - scene 2 只有剧情推进，没有主题冲突
-- 系统进入了 blocking gate
+- 系统触发了 blocking gate
 
-也就是说，当前系统已经能识别“只是发生事件，不等于戏剧成立”。
+这意味着系统已经能够识别：
 
-## 3. revise 后增加了什么
+“发生了事件”不等于“戏剧成立”。
 
-revise 后草稿最明显的新增，是每个场景都出现了更明确的修订锚点：
+## 3. 这轮 revise 做了什么
 
-- 驱动角色
-- 必须发生的决定
-- 必须兑现代价
-- 关系变化
-- 主题冲突
-- 风格执行
+这次修订不是整章重写，而是优先改有问题的 scene。
 
-这说明 revise 已经不再只是泛泛补句子，而是在 scene 级别进行结构化补强。
+核心变化有三类：
 
-## 4. 角色决策在哪里发生
+- 补强 driving character 的主动决策
+- 让 decision 与 cost 在 scene 内落地
+- 把价值冲突和 style directive 真正写进 scene
 
-主要看 revised draft 中每个 `【场景 X 修订锚点】` 和随后的场景正文。
+## 4. 示例：scene 1
 
-例如：
+### 原问题
 
-- `场景 1` 明确要求“林烬必须决定是继续推进，还是暂时后撤”
-- `场景 2` 明确要求“林烬必须在隐瞒、求助或抢先行动之间做决定”
-- `场景 3` 明确要求“林烬必须接受代价已经发生，而不是继续自我合理化”
+- 缺少明确决策
 
-这意味着 Character Engine 已经开始进入：
+### revise 策略
 
-- scene blueprint
-- draft
-- revise
+- 让林烬必须在“继续推进 / 暂时后撤”之间做选择
+- 让这个选择立刻带来代价
+- 让阻力来自对手与情境，而不是说明句
 
-## 5. 主题冲突在哪里发生
+### 改写后效果
 
-主要看 revised draft 中每个场景的这些字段：
+- 角色不再只是信息载体
+- scene 中出现了明确的“选择 -> 后果”
+- 关系压力开始进入动作与对白
 
-- `thematicTension`
-- `valuePositionA`
-- `valuePositionB`
-- `sceneStance`
+## 5. 示例：scene 2
 
-例如：
+### 原问题
 
-- 主题冲突从“代价与亲密 vs 力量可以无损获得”进入具体 scene
-- scene 2 开始明确要求“价值冲突通过选择体现”
-- scene 3 要求“让主题暂时占上风，但保留反主题诱惑”
+- 只有事件推进，没有主题冲突
 
-这说明 Theme Tracker 已经开始进入冲突设计，而不只是章后总结。
+### revise 策略
 
-## 6. 风格变化在哪里发生
+- 把“代价与亲密 vs 力量可以无损获得”的价值冲突写进场景
+- 让角色通过行为和对白站队
+- 用对白差异而不是说明句体现 tension
 
-主要看 revised draft 最前面的：
+### 改写后效果
 
-- `【风格控制】`
+- scene 不再只是情节连接段
+- 主题冲突开始承担结构作用
+- 风格控制开始进入正文内部
 
-以及每个场景里的：
+## 6. 角色、主题、风格分别怎么落地
 
-- `styleDirective`
+角色决策：
 
-目前它已经开始影响：
+- 看 revised draft 中每个场景的主动行动与代价兑现
 
-- 叙述方式
-- 对白差异化要求
-- 节奏说明
-- 描写密度要求
+主题冲突：
 
-这还不是最终成熟的 style controller，但它已经从“评审提示”进入“生成输入”。
+- 看 `comparison.json` 里的 `themeChange`
+- 看 revised draft 里冲突是否通过行为和对白体现
 
-## 7. 当前效果如何判断
+风格变化：
 
-这一版还不能说正文已经成熟，但它已经证明了三件重要的事：
+- 看 `comparison.json` 里的 `styleChange`
+- 看 revised draft 里节奏是否更紧、对白是否更分化
 
-1. Character 不再只停留在设定表  
-它开始约束谁做决定、付什么代价。
+## 7. 这份示例证明了什么
 
-2. Theme 不再只是总结  
-它开始进入 scene 的价值冲突设计。
+这份示例还不能证明正文已经成熟，但它已经证明三件重要的事：
 
-3. Style 不再只是事后分析  
-它开始作为 draft / revise 的显式控制输入。
+1. 系统开始能按 scene 改稿，而不是整章泛化修订
+2. Character / Theme / Style 已经进入具体改写决策
+3. comparison 不再只是 diff，而开始解释“为什么改、改了什么”
 
-## 8. 这份示例还不够好的地方
+## 8. 仍然不够好的地方
 
-当前 heuristic revise 仍然比较“结构化提示式”，不是真正自然的高质量重写，因此你还能明显看到：
+当前 heuristic revise 仍偏“结构化重写器”，还不是自然成熟的小说改写器，所以仍能看到：
 
-- 结构标签很多
 - 文本仍有模板感
-- 风格控制还偏显式注入
+- 局部语言质感还不够细
+- 风格控制还没有完全隐入正文
 
-但这份示例足够证明：
+但这份示例已经足够证明：
 
-系统已经开始把中间层转成“会影响正文”的硬约束，而不是只增加报告。
+系统开始把中间层变成“会影响正文”的硬约束，而不是只增加报告。

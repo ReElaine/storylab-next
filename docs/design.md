@@ -2,18 +2,18 @@
 
 ## 设计目标
 
-本项目要解决的不是“能不能写一章”，而是“怎样建立一套更适合高质量小说生产的独立架构”。
+这个项目要解决的不是“能不能写一章”，而是“怎样建立一套更适合高质量小说生产的独立架构”。
 
 当前设计目标：
 
 1. 强化读者体验评审
 2. 强化人物动态状态
 3. 引入场景级规划
-4. 引入主题追踪
+4. 引入主题追踪与主题冲突
 5. 引入更明确的风格控制
-6. 明确人类介入点
+6. 引入人工介入点
 7. 建立跨章累计状态
-8. 为后续高质量正文生成打底
+8. 让这些中间层真实影响正文生成与修订
 
 ## 当前架构层次
 
@@ -24,6 +24,7 @@
 - `plan-next`
 - `draft-from-plan`
 - `draft-cycle`
+- `revise-cycle`
 
 ### Pipeline 层
 
@@ -31,6 +32,7 @@
 - `StorylabRunner.planNext()`
 - `StorylabRunner.draftFromPlan()`
 - `StorylabRunner.draftCycle()`
+- `StorylabRunner.reviseCycle()`
 
 ### Store 层
 
@@ -38,9 +40,9 @@
 
 - 读取书籍与章节
 - 读取角色、主题、风格、gate 配置
-- 管理 story 目录输出
-- 管理 draft 目录输出
-- 读取累计状态
+- 管理 `story/` 目录输出
+- 管理 `drafts/` 目录输出
+- 读取与回写跨章累计状态
 
 ### Module 层
 
@@ -53,43 +55,33 @@
 - `HistoryBuilder`
 - `ChapterPlanner`
 - `DraftGenerator`
+- `SceneAuditor`
 
-### Draft Engine 层
+### Engine 层
 
-当前草稿生成已抽象成独立引擎：
-
-- `HeuristicDraftWriter`
-- `OpenAIDraftWriter`
-
-统一入口：
-
-- `createDraftWriterFromEnv()`
-
-### Analysis Engine 层
-
-当前 `run` 已抽象成独立引擎：
+分析：
 
 - `HeuristicAnalysisEngine`
 - `OpenAIAnalysisEngine`
 
-统一入口：
-
-- `createAnalysisEngineFromEnv()`
-
-### Planning Engine 层
-
-当前 `plan-next` 已抽象成独立引擎：
+规划：
 
 - `HeuristicPlanningEngine`
 - `OpenAIPlanningEngine`
 
-统一入口：
+起草：
 
-- `createPlanningEngineFromEnv()`
+- `HeuristicDraftWriter`
+- `OpenAIDraftWriter`
+
+修订：
+
+- `HeuristicReviseEngine`
+- `OpenAIReviseEngine`
 
 ## 数据结构
 
-### 单章结构
+单章：
 
 - `ScenePlanItem`
 - `CharacterState`
@@ -98,83 +90,85 @@
 - `ReaderExperienceReport`
 - `GateDecision`
 
-### 跨章结构
+跨章：
 
 - `CharacterHistory`
 - `ThemeHistory`
 - `StoryMemory`
 
-### 规划结构
+规划：
 
 - `ChapterPlan`
+- `SceneBlueprintItem`
 
-### 草稿闭环结构
+修订：
 
-- `StorylabDraftResult`
-- `DraftReviewArtifacts`
-- `StorylabDraftCycleResult`
+- `BlockingGateStatus`
+- `RevisionComparisonReport`
+- `SceneRevisionExplanation`
 
-## 单章处理流
+## Character / Theme / Style 如何进入 generation pipeline
 
-`run(bookId, chapterNumber)`：
+这部分是当前架构的核心，不再只是“报告层”。
 
-1. 读取章节与基础配置
-2. 生成 scene plan
-3. 更新 character state
-4. 生成 theme report
-5. 生成 style report
-6. 生成 reader report
-7. 生成 gate decision
-8. 生成 revision brief
-9. 合并 character history
-10. 合并 theme history
-11. 更新 story memory
-12. 全部落盘
+### 1. Character 约束
 
-## 跨章累计状态设计
+每个 `sceneBlueprint` 现在至少包含：
 
-### Character History
+- `drivingCharacter`
+- `opposingForce`
+- `decision`
+- `cost`
+- `relationshipChange`
 
-保存每个角色随章节推进的：
+这意味着 draft 和 revise 都必须回答：
 
-- desire
-- fear
-- recentDecision
-- decisionCost
-- arcProgress
+- 谁在推动这个场景
+- 谁在阻碍
+- 角色做了什么决定
+- 这个决定的代价是什么
+- 关系怎样发生位移
 
-当前文件：
+Character Engine 不再只是“人物设定一致性检查”，而是开始决定 scene 如何被改写。
 
-- `story/characters/character-history.json`
+### 2. Theme 约束
 
-### Theme History
+每个 `sceneBlueprint` 现在至少包含：
 
-保存每章主题推进结果：
+- `thematicTension`
+- `valuePositionA`
+- `valuePositionB`
+- `sceneStance`
 
-- `theme`
-- `antiTheme`
-- `themeSignalCount`
-- `antiSignalCount`
-- `interpretation`
+这意味着 scene 不再只承担剧情推进，也必须承担价值冲突推进。
 
-当前文件：
+Theme Tracker 不再只是章后总结，而是会参与：
 
-- `story/themes/theme-history.json`
+- planning 时的冲突设计
+- draft 时的行为约束
+- revise 时的局部重写方向
 
-### Story Memory
+### 3. Style 约束
 
-汇总全局层面信息：
+`ChapterPlan` 现在包含：
 
-- 最近分析到哪一章
-- 仍在推进的 hooks
-- 尚未解决的风险
-- 读者体验平均分轨迹
+- `styleProfile`
 
-当前文件：
+每个 `sceneBlueprint` 还包含：
 
-- `story/memory/story-memory.json`
+- `styleDirective`
 
-## 下一章规划设计
+这意味着 draft / revise 不再只是“参考一下风格说明”，而是必须消费结构化风格约束。
+
+当前 style profile 重点约束：
+
+- narration style
+- dialogue style
+- pacing profile
+- description density
+- tone constraints
+
+## 章节规划设计
 
 `planNext(bookId, targetChapterNumber)` 会读取累计状态，生成：
 
@@ -187,50 +181,13 @@
 - style profile
 - gate note
 
-当前文件：
+输出文件：
 
 - `story/planning/chapter-XXXX.chapter-plan.json`
 
-这个设计的意义是把“分析过去章节”和“规划下一章节”接起来，为 writer 主链准备明确输入。
+这个设计的意义，是把“过去发生了什么”和“下一章该怎么写”接起来。
 
-### Character / Theme / Style 如何进入 generation pipeline
-
-当前这一层已经不再只是“章节提纲”，而是包含三种硬约束：
-
-1. Character 约束  
-每个 `sceneBlueprint` 现在至少包含：
-- `drivingCharacter`
-- `opposingForce`
-- `decision`
-- `cost`
-- `relationshipChange`
-
-这意味着 draft 与 revise 都必须回答：
-- 谁在推动场景
-- 谁在阻碍
-- 该角色做了什么决定
-- 代价如何落地
-- 关系如何变化
-
-2. Theme 约束  
-每个 `sceneBlueprint` 现在至少包含：
-- `thematicTension`
-- `valuePositionA`
-- `valuePositionB`
-- `sceneStance`
-
-这意味着 scene 不再只是推进剧情，也必须承担价值冲突。
-
-3. Style 约束  
-`ChapterPlan` 现在包含：
-- `styleProfile`
-
-每个 `sceneBlueprint` 还会带：
-- `styleDirective`
-
-这意味着 draft / revise 不再只“参考风格说明”，而是必须消费结构化风格约束。
-
-## 草稿生成设计
+## 起草设计
 
 `draftFromPlan(bookId, targetChapterNumber)` 会读取：
 
@@ -238,18 +195,11 @@
 - `character-history.json`
 - `theme-history.json`
 
-然后通过 draft engine 生成草稿并写入：
+然后通过 `draft engine` 生成草稿并写入：
 
 - `drafts/000X_<title>.md`
 
-当前支持：
-
-- heuristic writer
-- OpenAI-compatible writer
-
-### 草稿生成现在必须吃哪些硬输入
-
-当前 draft 不只是读取 chapter mission，而是显式读取：
+### draft 阶段必须消费的硬输入
 
 - `sceneBlueprint.goal`
 - `sceneBlueprint.conflict`
@@ -263,43 +213,70 @@
 - `sceneBlueprint.cost`
 - `sceneBlueprint.relationshipChange`
 - `sceneBlueprint.thematicTension`
+- `sceneBlueprint.valuePositionA`
+- `sceneBlueprint.valuePositionB`
 - `sceneBlueprint.sceneStance`
 - `sceneBlueprint.styleDirective`
 - `styleProfile`
 
-这使 `scene -> draft` 的约束开始变硬。
+这使得 `scene -> draft` 的约束开始变硬。
 
-## 草稿评审闭环
+## scene-level revise 设计
 
-`draftCycle(bookId, targetChapterNumber)` 是当前新接上的第一版闭环：
+这轮最关键的变化，是 revise 开始支持“只改一个 scene”。
 
-1. 先调用 `draftFromPlan`
-2. 读取已经落盘的草稿正文
-3. 重用分析模块对草稿执行评审
-4. 输出草稿评审 JSON
-5. 输出草稿 revision brief
+### revise 输入
 
-当前输出：
+每个待修 scene 的输入包含：
 
-- `story/reviews/drafts/chapter-XXXX.draft-review.json`
-- `story/reviews/drafts/chapter-XXXX.draft-revision-brief.md`
+- 原 scene 文本
+- scene blueprint
+- 该 scene 的 critique 问题列表
+- character constraints
+- theme constraints
+- style constraints
 
-这一步的意义是把系统从“只会规划和出草稿”推进到“开始能对自己的草稿做结构化回看”。
+### revise 行为
 
-## 修订闭环中的 Character / Theme / Style
+- 优先只处理 blocking scenes 或 issue scenes
+- 不改其他 scene
+- 只替换目标 scene 的文本
+- 保持前后场景边界与顺序
 
-`reviseCycle(bookId, targetChapterNumber)` 现在会把以下约束真正送进 revise engine：
+### revise 输出
 
-- 角色决策与代价
-- 主题冲突与价值对立
-- style profile 与 style directive
-- scene audit 问题
+- revised draft
+- scene-level comparison explanation
 
-当前 heuristic revise 仍然比较粗，但它已经开始围绕“scene 级修订锚点”工作，而不是整章泛化重写。
+## comparison 设计
+
+`comparison.json` 不再只是分数差，而是解释层。
+
+当前会输出：
+
+- reader score delta
+- scene issue delta
+- `sceneChanges`
+
+每个 `sceneChanges` 条目包含：
+
+- `beforeProblems`
+- `rewriteStrategy`
+- `characterChange`
+- `themeChange`
+- `styleChange`
+- `beforeExcerpt`
+- `afterExcerpt`
+
+它回答的是：
+
+- 为什么这个 scene 被改
+- 改了什么
+- 改好在哪
 
 ## Blocking Gate 最小版
 
-当前已经加入最小 blocking gate：
+当前已经引入最小 blocking gate：
 
 - 如果 `reader experience` 关键分数过低
 - 或 `scene audit` 出现 `high severity` 问题
@@ -308,37 +285,28 @@
 
 - `draft-cycle` / `revise-cycle` 会返回 blocking 状态
 - 默认阻断继续
-- 必须显式传 `--override` 才能继续
+- 必须显式传入 `--override` 才能继续
+
+而且 gate 现在会指出：
+
+- 哪些 scene 导致 blocking
+- 严重问题类型是什么
 
 ## 当前边界
 
-### 已经完成
+已经完成：
 
 - 单章增强分析
 - 跨章累计状态
-- 下一章规划
-- 基于规划生成草稿
-- 第一版 `plan -> draft -> review` 闭环
-- analysis / planning / draft engine 抽象
+- 章节规划
+- 起草
+- 初版修订闭环
+- scene-level revise 第一版
+- scene-level comparison 第一版
 
-### 还未完成
+仍需继续加强：
 
-- scene history
-- scene auditor
-- 更强的 planner LLM 质量
-- 更强的 critic LLM 质量
-- 高质量正文生成
-- 真正阻断式 human gate
-- 完整 revision loop
-
-## 为什么这个方向合理
-
-因为它先把真正决定小说质量的中间层做出来：
-
-- 读者体验
-- 人物弧线
-- 主题推进
-- 场景蓝图
-- 人类可控点
-
-这些层稳定后，再接高质量正文生成，收益会明显高于“先写正文，再补审查”。 
+- heuristic revise 仍偏结构化改写
+- style control 还可进一步内化到局部重写
+- scene 内更细粒度的局部定位还不够
+- 更成熟的 LLM rewrite 质量还未验证到位

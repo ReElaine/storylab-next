@@ -255,6 +255,21 @@ export interface SceneAuditReport {
 export interface BlockingGateStatus {
   readonly blocking: boolean;
   readonly reasons: ReadonlyArray<string>;
+  readonly blockingScenes: ReadonlyArray<{
+    readonly sceneNumber: number;
+    readonly issueTypes: ReadonlyArray<string>;
+  }>;
+}
+
+export interface SceneRevisionExplanation {
+  readonly sceneNumber: number;
+  readonly beforeProblems: ReadonlyArray<string>;
+  readonly rewriteStrategy: ReadonlyArray<string>;
+  readonly characterChange: string;
+  readonly themeChange: string;
+  readonly styleChange: string;
+  readonly beforeExcerpt: string;
+  readonly afterExcerpt: string;
 }
 
 export interface RevisionComparisonReport {
@@ -270,6 +285,7 @@ export interface RevisionComparisonReport {
   readonly summary: string;
   readonly improved: ReadonlyArray<string>;
   readonly unresolved: ReadonlyArray<string>;
+  readonly sceneChanges: ReadonlyArray<SceneRevisionExplanation>;
 }
 
 export interface StorylabDraftCycleResult {
