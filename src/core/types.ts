@@ -270,6 +270,38 @@ export interface SceneRewriteMetadata {
   readonly strategy: ReadonlyArray<string>;
 }
 
+export interface TextualChangeEvidenceItem {
+  readonly evidenceLayer: "structural" | "textual" | "localized";
+  readonly changeType:
+    | "decision_added"
+    | "cost_clarified"
+    | "conflict_strengthened"
+    | "thematic_tension_inserted"
+    | "dialogue_differentiated"
+    | "pacing_compressed"
+    | "style_tightened"
+    | "general_rewrite";
+  readonly locationHint: "opening" | "middle" | "closing" | "full_scene";
+  readonly beforeSnippet: string;
+  readonly afterSnippet: string;
+  readonly functionOfChange: string;
+}
+
+export interface IssueResolution {
+  readonly issue: string;
+  readonly status: "resolved" | "partially_resolved" | "unresolved" | "regressed";
+  readonly evidence: string;
+}
+
+export interface PostRewriteAssessment {
+  readonly issueResolution: ReadonlyArray<IssueResolution>;
+  readonly newIssuesIntroduced: ReadonlyArray<string>;
+  readonly rewriteOutcome: "worse" | "unchanged" | "slightly_better" | "clearly_better";
+  readonly benefitSummary: ReadonlyArray<
+    "improved_structure" | "improved_clarity" | "improved_tension" | "improved_style" | "no_meaningful_gain"
+  >;
+}
+
 export interface RevisionTrace {
   readonly targetSceneNumbers: ReadonlyArray<number>;
   readonly actualRewrittenSceneNumbers: ReadonlyArray<number>;
@@ -285,16 +317,40 @@ export interface SceneRevisionExplanation {
   readonly sceneAnchor?: string;
   readonly beforeProblems: ReadonlyArray<string>;
   readonly appliedRewriteStrategy: ReadonlyArray<string>;
-  readonly textualChangeEvidence: ReadonlyArray<string>;
+  readonly textualChangeEvidence: ReadonlyArray<TextualChangeEvidenceItem>;
   readonly characterChange: string;
   readonly themeChange: string;
   readonly styleChange: string;
-  readonly postRewriteAssessment: {
-    readonly resolvedProblems: ReadonlyArray<string>;
-    readonly remainingProblems: ReadonlyArray<string>;
-  };
+  readonly postRewriteAssessment: PostRewriteAssessment;
   readonly beforeExcerpt: string;
   readonly afterExcerpt: string;
+}
+
+export interface RewriteFacts {
+  readonly targetSceneNumbers: ReadonlyArray<number>;
+  readonly actualRewrittenSceneNumbers: ReadonlyArray<number>;
+  readonly comparisonSceneNumbers: ReadonlyArray<number>;
+  readonly unchangedSceneNumbers: ReadonlyArray<number>;
+  readonly reviewedButNotRewrittenSceneNumbers: ReadonlyArray<number>;
+  readonly sceneRewriteMetadata: Readonly<Record<string, SceneRewriteMetadata>>;
+  readonly sceneAlignment: {
+    readonly mappingBasis: string;
+    readonly beforeParsedSceneNumbers: ReadonlyArray<number>;
+    readonly afterParsedSceneNumbers: ReadonlyArray<number>;
+    readonly beforeAnalysisSceneNumbers: ReadonlyArray<number>;
+    readonly afterAnalysisSceneNumbers: ReadonlyArray<number>;
+    readonly stableByParsedScenes: boolean;
+    readonly stableByAnalysisScenes: boolean;
+  };
+}
+
+export interface RewriteInterpretation {
+  readonly summary: string;
+  readonly improved: ReadonlyArray<string>;
+  readonly unresolved: ReadonlyArray<string>;
+  readonly benefitSummary: ReadonlyArray<
+    "improved_structure" | "improved_clarity" | "improved_tension" | "improved_style" | "no_meaningful_gain"
+  >;
 }
 
 export interface RevisionComparisonReport {
@@ -307,6 +363,8 @@ export interface RevisionComparisonReport {
     readonly memorability: number;
   };
   readonly sceneIssueDelta: number;
+  readonly rewriteFacts: RewriteFacts;
+  readonly rewriteInterpretation: RewriteInterpretation;
   readonly summary: string;
   readonly improved: ReadonlyArray<string>;
   readonly unresolved: ReadonlyArray<string>;

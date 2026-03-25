@@ -150,7 +150,7 @@ const themeSeeds = [
   },
 ];
 
-test("single-scene verification proves only one blocking scene is rewritten", async () => {
+test("semi-controlled chapter sample proves a single rewritten scene is both traceable and beneficial", async () => {
   const reviseEngine = new HeuristicReviseEngine();
 
   const beforeDraft = {
@@ -320,7 +320,24 @@ test("single-scene verification proves only one blocking scene is rewritten", as
     comparison.sceneChanges.map((entry) => entry.sceneNumber),
     [2],
   );
+  assert.equal(comparison.rewriteFacts.actualRewrittenSceneNumbers[0], 2);
   assert.ok(
-    comparison.sceneChanges[0]?.textualChangeEvidence.some((entry) => entry.includes("decision") || entry.includes("theme")),
+    comparison.sceneChanges[0]?.textualChangeEvidence.some((entry) => entry.changeType === "decision_added"),
+  );
+  assert.ok(
+    comparison.sceneChanges[0]?.textualChangeEvidence.some((entry) => entry.changeType === "thematic_tension_inserted"),
+  );
+  assert.ok(
+    comparison.sceneChanges[0]?.textualChangeEvidence.every(
+      (entry) => entry.beforeSnippet.length > 0 && entry.afterSnippet.length > 0,
+    ),
+  );
+  assert.deepEqual(
+    comparison.sceneChanges[0]?.postRewriteAssessment.issueResolution.map((entry) => entry.status),
+    ["resolved", "resolved"],
+  );
+  assert.equal(comparison.sceneChanges[0]?.postRewriteAssessment.rewriteOutcome, "clearly_better");
+  assert.ok(
+    comparison.rewriteInterpretation.benefitSummary.includes("improved_structure"),
   );
 });
