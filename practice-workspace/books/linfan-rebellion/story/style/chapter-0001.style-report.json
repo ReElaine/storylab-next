@@ -1,0 +1,14 @@
+{
+  "averageSentenceLength": 30.09259259259259,
+  "dialogueRatio": 0.1111111111111111,
+  "descriptionRatio": 0.2222222222222222,
+  "rhythmNote": "句长偏稳，需要注意是否压低了冲突速度",
+  "adherenceNote": "目标叙述风格为“近距离第三人称，紧贴林凡的压抑、愤怒和决断”，当前对白占比 0.11，描写占比 0.22。",
+  "styleDriftPoints": [
+    "句子整体偏长，可能压低冲突推进速度"
+  ],
+  "dialogueHomogeneitySpots": [
+    "需要增加角色间差异化对白，避免所有角色都像同一个叙述者"
+  ],
+  "descriptionBalanceNote": "建议按“少解释，多动作、多对话、多现场反馈”控制描写密度，并结合“每段只推进一个压力点，不写空泛感慨”整理段落功能。"
+}

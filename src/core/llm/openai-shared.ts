@@ -1,9 +1,18 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import OpenAI from "openai";
 
 export interface OpenAIWriterConfig {
   readonly apiKey: string;
   readonly model: string;
   readonly baseUrl?: string;
+}
+
+interface LocalLLMConfig {
+  readonly provider?: string;
+  readonly baseUrl?: string;
+  readonly apiKey?: string;
+  readonly models?: Partial<Record<"analysis" | "reader" | "planner" | "draft" | "writer" | "revise", ReadonlyArray<string>>>;
 }
 
 export function createOpenAIClient(config: OpenAIWriterConfig): OpenAI {
@@ -13,17 +22,51 @@ export function createOpenAIClient(config: OpenAIWriterConfig): OpenAI {
   });
 }
 
+function loadLocalLLMConfig(): LocalLLMConfig | null {
+  const configPath = join(process.cwd(), "config", "llm.local.json");
+  if (!existsSync(configPath)) {
+    return null;
+  }
+
+  try {
+    const raw = readFileSync(configPath, "utf-8");
+    return JSON.parse(raw) as LocalLLMConfig;
+  } catch {
+    return null;
+  }
+}
+
+function resolveLocalModel(normalizedPrefix: string, config: LocalLLMConfig | null): string | undefined {
+  const key = normalizedPrefix.replace(/^STORYLAB_/, "").replace(/_OPENAI$/, "").toLowerCase();
+  const bucket = key === "analysis" || key === "reader" || key === "planner" || key === "draft" || key === "writer" || key === "revise"
+    ? config?.models?.[key]
+    : undefined;
+
+  return (
+    bucket?.[0]?.trim() ||
+    config?.models?.writer?.[0]?.trim() ||
+    config?.models?.reader?.[0]?.trim() ||
+    config?.models?.draft?.[0]?.trim() ||
+    config?.models?.revise?.[0]?.trim() ||
+    config?.models?.analysis?.[0]?.trim()
+  );
+}
+
 export function resolveOpenAIConfig(prefix: string): OpenAIWriterConfig | null {
   const normalized = prefix.trim().toUpperCase();
+  const localConfig = loadLocalLLMConfig();
   const apiKey =
     process.env[`${normalized}_OPENAI_API_KEY`]?.trim() ??
-    process.env.STORYLAB_OPENAI_API_KEY?.trim();
+    process.env.STORYLAB_OPENAI_API_KEY?.trim() ??
+    localConfig?.apiKey?.trim();
   const model =
     process.env[`${normalized}_OPENAI_MODEL`]?.trim() ??
-    process.env.STORYLAB_OPENAI_MODEL?.trim();
+    process.env.STORYLAB_OPENAI_MODEL?.trim() ??
+    resolveLocalModel(normalized, localConfig);
   const baseUrl =
     process.env[`${normalized}_OPENAI_BASE_URL`]?.trim() ??
-    process.env.STORYLAB_OPENAI_BASE_URL?.trim();
+    process.env.STORYLAB_OPENAI_BASE_URL?.trim() ??
+    localConfig?.baseUrl?.trim();
 
   if (!apiKey || !model) {
     return null;
@@ -50,4 +93,49 @@ export function extractJsonObject(raw: string): string {
   }
 
   throw new Error("No JSON object found in model response");
+}
+
+function stripControlCharacters(value: string): string {
+  return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/gu, "");
+}
+
+function removeTrailingCommas(value: string): string {
+  return value.replace(/,\s*([}\]])/gu, "$1");
+}
+
+function insertMissingPropertyCommas(value: string): string {
+  return value
+    .replace(/("|\]|\})\s*\n\s*(")([^"]+?)"\s*:/gu, '$1,\n  $2$3":')
+    .replace(/("|\]|\})\s*(")([^"]+?)"\s*:/gu, '$1, $2$3":');
+}
+
+function normalizeCommonPunctuation(value: string): string {
+  return value
+    .replace(/\u201c|\u201d/gu, '"')
+    .replace(/\u2018|\u2019/gu, "'");
+}
+
+function buildJsonRepairCandidates(raw: string): ReadonlyArray<string> {
+  const extracted = extractJsonObject(raw);
+  const base = stripControlCharacters(normalizeCommonPunctuation(extracted)).trim();
+  const candidates = new Set<string>([base]);
+  candidates.add(removeTrailingCommas(base));
+  candidates.add(insertMissingPropertyCommas(base));
+  candidates.add(removeTrailingCommas(insertMissingPropertyCommas(base)));
+  return Array.from(candidates).filter((entry) => entry.length > 0);
+}
+
+export function parseJsonObjectWithRepair<T>(raw: string): T {
+  const candidates = buildJsonRepairCandidates(raw);
+  let lastError: unknown;
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate) as T;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Failed to parse JSON model response");
 }

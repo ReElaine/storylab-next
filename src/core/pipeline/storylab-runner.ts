@@ -1,50 +1,216 @@
+import { buildRevisionBrief } from "../modules/revision-brief.js";
 import { HistoryBuilder } from "../modules/history-builder.js";
+import { HumanReviewGatekeeper } from "../modules/human-review-gates.js";
 import { SceneAuditor } from "../modules/scene-auditor.js";
-import { ProjectStore } from "../project/project-store.js";
-import type {
-  ChapterAnalysisBundle,
-  ChapterDraft,
-  ChapterPlan,
-  DraftReviewArtifacts,
-  DraftReviewArtifacts as RevisionArtifacts,
-  SceneAuditReport,
-  StorylabDraftCycleResult,
-  StorylabDraftResult,
-  StorylabPlanResult,
-  StorylabRevisionCycleResult,
-  StorylabRunResult,
-} from "../types.js";
 import { createAnalysisEngineFromEnv, type AnalysisEngine } from "../llm/analysis-engine.js";
-import { createDraftWriterFromEnv, type DraftWriter } from "../llm/draft-engine.js";
+import { createPlanningEngineFromEnv, type PlanningEngine } from "../llm/planning-engine.js";
+import { createReaderCriticEngineFromEnv, type ReaderCriticEngine } from "../llm/reader-engine.js";
 import {
   buildBlockingGateStatus,
   buildRevisionComparisonReport,
   createReviseEngineFromEnv,
   type ReviseEngine,
 } from "../llm/revise-engine.js";
-import { createPlanningEngineFromEnv, type PlanningEngine } from "../llm/planning-engine.js";
+import { createWriterAgentFromEnv, type WriterAgent } from "../llm/writer-engine.js";
+import { ProjectStore } from "../project/project-store.js";
+import type {
+  BlockingGateStatus,
+  ChapterAnalysisBundle,
+  ChapterDraft,
+  ChapterPlan,
+  StorylabWriterCycleResult,
+  StorylabWriterResult,
+  WriterReviewArtifacts,
+  WriterReviewArtifacts as RevisionArtifacts,
+  SceneAuditReport,
+  StorylabPlanResult,
+  StorylabRevisionCycleResult,
+  StorylabRevisionLoopIteration,
+  StorylabRevisionLoopResult,
+  StorylabRunResult,
+} from "../types.js";
+
+function dedupeNumbers(values: ReadonlyArray<number>): ReadonlyArray<number> {
+  return Array.from(new Set(values)).sort((left, right) => left - right);
+}
+
+function collectSceneNumbersFromText(lines: ReadonlyArray<string>): ReadonlyArray<number> {
+  const values = new Set<number>();
+  for (const line of lines) {
+    const matches = line.matchAll(/场景\s*(\d+)/gu);
+    for (const match of matches) {
+      const sceneNumber = Number.parseInt(match[1] ?? "", 10);
+      if (Number.isFinite(sceneNumber)) {
+        values.add(sceneNumber);
+      }
+    }
+  }
+  return Array.from(values);
+}
+
+function selectRevisionTargetScenes(
+  plan: ChapterPlan,
+  sceneAudit: SceneAuditReport,
+  analysis: Pick<ChapterAnalysisBundle, "readerReport">,
+): ReadonlyArray<number> {
+  const severityWeight = (severity: SceneAuditReport["issues"][number]["severity"]): number => {
+    if (severity === "high") return 3;
+    if (severity === "medium") return 2;
+    return 1;
+  };
+
+  const importanceWeight = (scene: ChapterPlan["sceneBlueprint"][number] | undefined): number => {
+    if (!scene) return 0;
+    const text = [
+      scene.goal,
+      scene.conflict,
+      scene.turn,
+      scene.result,
+      scene.decision,
+      scene.cost,
+      scene.thematicTension,
+      scene.styleDirective,
+    ].join(" ");
+
+    let score = 0;
+    if (/爆发|反击|反抗|夺回|决策|代价|高潮|最强冲突/u.test(text)) score += 3;
+    if (/转折|后果|记恨|危险|断供/u.test(text)) score += 2;
+    return score;
+  };
+
+  const costLandingWeight = (scene: ChapterPlan["sceneBlueprint"][number] | undefined): number => {
+    if (!scene) return 0;
+    const text = [scene.cost, scene.result, scene.thematicTension, scene.styleDirective, scene.sceneStance].join(" ");
+    let score = 0;
+    if (/代价|后果|断供|危险|记恨|打压|阴影/u.test(text)) score += 4;
+    if (/收束|隐患|更冷|后续/u.test(text)) score += 2;
+    return score;
+  };
+
+  const strongestConflictScene = plan.sceneBlueprint
+    .slice()
+    .sort((left, right) => importanceWeight(right) - importanceWeight(left) || left.sceneNumber - right.sceneNumber)[0];
+  const strongestCostScene = plan.sceneBlueprint
+    .slice()
+    .sort((left, right) => costLandingWeight(right) - costLandingWeight(left) || right.sceneNumber - left.sceneNumber)[0];
+
+  const scoreByScene = new Map<number, number>();
+  for (const issue of sceneAudit.issues) {
+    scoreByScene.set(issue.sceneNumber, (scoreByScene.get(issue.sceneNumber) ?? 0) + severityWeight(issue.severity));
+  }
+
+  const readerMentionedScenes = collectSceneNumbersFromText([
+    ...analysis.readerReport.risks,
+    ...analysis.readerReport.revisionSuggestions,
+  ]);
+  for (const sceneNumber of readerMentionedScenes) {
+    scoreByScene.set(sceneNumber, (scoreByScene.get(sceneNumber) ?? 0) + 4);
+  }
+
+  if (scoreByScene.size === 0 && analysis.readerReport.scores.emotionalPeak <= 8 && strongestConflictScene) {
+    scoreByScene.set(strongestConflictScene.sceneNumber, importanceWeight(strongestConflictScene) + 1);
+  }
+
+  if (scoreByScene.size === 0) {
+    return [];
+  }
+
+  const ranked = Array.from(scoreByScene.entries())
+    .map(([sceneNumber, score]) => ({
+      sceneNumber,
+      score: score + importanceWeight(plan.sceneBlueprint.find((scene) => scene.sceneNumber === sceneNumber)),
+    }))
+    .sort((left, right) => right.score - left.score || left.sceneNumber - right.sceneNumber);
+
+  const topScore = ranked[0]?.score ?? 0;
+  const selected = ranked
+    .filter((entry) => entry.score >= topScore - 1)
+    .map((entry) => entry.sceneNumber)
+    .slice(0, 2);
+
+  if (
+    analysis.readerReport.scores.emotionalPeak <= 8 &&
+    strongestConflictScene &&
+    !selected.includes(strongestConflictScene.sceneNumber)
+  ) {
+    selected.push(strongestConflictScene.sceneNumber);
+  }
+
+  if (
+    strongestCostScene &&
+    !selected.includes(strongestCostScene.sceneNumber) &&
+    (selected.length === 1 || analysis.readerReport.risks.some((risk) => /代价|隐患|后续|断供|危险/u.test(risk)))
+  ) {
+    selected.push(strongestCostScene.sceneNumber);
+  }
+
+  return dedupeNumbers(selected).slice(0, 2);
+}
+
+interface RevisionPassContext {
+  readonly bookId: string;
+  readonly chapterNumber: number;
+  readonly book: Awaited<ReturnType<ProjectStore["loadBook"]>>;
+  readonly plan: ChapterPlan;
+  readonly characterSeeds: Awaited<ReturnType<ProjectStore["loadCharacterSeeds"]>>;
+  readonly themeSeeds: Awaited<ReturnType<ProjectStore["loadThemeSeeds"]>>;
+  readonly styleGuide: Awaited<ReturnType<ProjectStore["loadStyleGuide"]>>;
+  readonly gates: Awaited<ReturnType<ProjectStore["loadHumanGates"]>>;
+  readonly previousCharacterHistory: Awaited<ReturnType<ProjectStore["loadCharacterHistory"]>>;
+  readonly previousThemeHistory: Awaited<ReturnType<ProjectStore["loadThemeHistory"]>>;
+  readonly previousMemory: Awaited<ReturnType<ProjectStore["loadStoryMemory"]>>;
+}
+
+interface RevisionPassArtifacts {
+  readonly beforeAnalysis: ChapterAnalysisBundle;
+  readonly beforeSceneAudit: SceneAuditReport;
+  readonly blockingGate: BlockingGateStatus;
+  readonly targetSceneNumbers: ReadonlyArray<number>;
+  readonly revisedDraft: ChapterDraft;
+  readonly revisedWorkingPath: string;
+  readonly afterAnalysis: ChapterAnalysisBundle;
+  readonly afterSceneAudit: SceneAuditReport;
+  readonly postRevisionGate: BlockingGateStatus;
+  readonly comparisonPath: string;
+  readonly reviewPath: string;
+  readonly revisedReviewPath: string;
+  readonly revisionTrace: StorylabRevisionCycleResult["targetSceneNumbers"] extends ReadonlyArray<number> ? Awaited<ReturnType<ReviseEngine["revise"]>>["trace"] : never;
+}
 
 export class StorylabRunner {
   private readonly store: ProjectStore;
   private readonly historyBuilder = new HistoryBuilder();
-  private readonly draftWriter: DraftWriter;
+  private readonly writerAgent: WriterAgent;
   private readonly reviseEngine: ReviseEngine;
   private readonly analysisEngine: AnalysisEngine;
+  private readonly readerEngine: ReaderCriticEngine;
   private readonly planningEngine: PlanningEngine;
   private readonly sceneAuditor = new SceneAuditor();
+  private readonly gatekeeper = new HumanReviewGatekeeper();
 
   constructor(workspaceRoot: string) {
     this.store = new ProjectStore(workspaceRoot);
-    this.draftWriter = createDraftWriterFromEnv();
+    this.writerAgent = createWriterAgentFromEnv();
     this.reviseEngine = createReviseEngineFromEnv();
     this.analysisEngine = createAnalysisEngineFromEnv();
+    this.readerEngine = createReaderCriticEngineFromEnv();
     this.planningEngine = createPlanningEngineFromEnv();
   }
 
   async run(bookId: string, chapterNumber: number): Promise<StorylabRunResult> {
     await this.store.ensureStoryDirs(bookId);
 
-    const [book, chapterText, characterSeeds, themeSeeds, styleGuide, gates, previousCharacterHistory, previousThemeHistory, previousMemory] = await Promise.all([
+    const [
+      book,
+      chapterText,
+      characterSeeds,
+      themeSeeds,
+      styleGuide,
+      gates,
+      previousCharacterHistory,
+      previousThemeHistory,
+      previousMemory,
+    ] = await Promise.all([
       this.store.loadBook(bookId),
       this.store.loadChapter(bookId, chapterNumber),
       this.store.loadCharacterSeeds(bookId),
@@ -72,6 +238,8 @@ export class StorylabRunner {
       chapterNumber,
       outputs,
       provider: this.analysisEngine.name,
+      analysisProvider: this.analysisEngine.name,
+      readerProvider: this.readerEngine.name,
     };
   }
 
@@ -109,7 +277,7 @@ export class StorylabRunner {
     };
   }
 
-  async draftFromPlan(bookId: string, targetChapterNumber: number): Promise<StorylabDraftResult> {
+  async writerFromPlan(bookId: string, targetChapterNumber: number): Promise<StorylabWriterResult> {
     await this.store.ensureStoryDirs(bookId);
     const [plan, characterHistory, themeHistory] = await Promise.all([
       this.store.loadChapterPlan(bookId, targetChapterNumber),
@@ -121,21 +289,30 @@ export class StorylabRunner {
       throw new Error(`No chapter plan found for chapter ${targetChapterNumber}. Run plan-next first.`);
     }
 
-    const draft = await this.draftWriter.generate({ plan, characterHistory, themeHistory });
-    const outputPath = await this.store.writeDraft(bookId, draft);
+    const draft = await this.writerAgent.generate({ plan, characterHistory, themeHistory });
+    const writerWorkingPath = await this.store.writeWriterWorking(bookId, draft);
 
     return {
       bookId,
       chapterNumber: targetChapterNumber,
-      outputPath,
-      provider: this.draftWriter.name,
+      writerWorkingPath,
+      provider: this.writerAgent.name,
+      writerProvider: this.writerAgent.name,
     };
   }
 
-  async draftCycle(bookId: string, targetChapterNumber: number, override = false): Promise<StorylabDraftCycleResult> {
+  async writeFromPlan(bookId: string, targetChapterNumber: number): Promise<StorylabWriterResult> {
+    return this.writerFromPlan(bookId, targetChapterNumber);
+  }
+
+  async draftFromPlan(bookId: string, targetChapterNumber: number): Promise<StorylabWriterResult> {
+    return this.writerFromPlan(bookId, targetChapterNumber);
+  }
+
+  async writerCycle(bookId: string, targetChapterNumber: number, override = false): Promise<StorylabWriterCycleResult> {
     await this.store.ensureStoryDirs(bookId);
-    const [draftResult, book, plan, characterSeeds, themeSeeds, styleGuide, gates] = await Promise.all([
-      this.draftFromPlan(bookId, targetChapterNumber),
+    const [writerResult, book, plan, characterSeeds, themeSeeds, styleGuide, gates] = await Promise.all([
+      this.writerFromPlan(bookId, targetChapterNumber),
       this.store.loadBook(bookId),
       this.store.loadChapterPlan(bookId, targetChapterNumber),
       this.store.loadCharacterSeeds(bookId),
@@ -148,39 +325,196 @@ export class StorylabRunner {
       throw new Error(`No chapter plan found for chapter ${targetChapterNumber}.`);
     }
 
-    const draftContent = await this.store.loadDraftContent(bookId, targetChapterNumber);
+    const writerText = await this.store.loadWriterWorkingContent(bookId, targetChapterNumber);
     const analysis = await this.analyzeChapterText(
       targetChapterNumber,
-      draftContent,
+      writerText,
       characterSeeds,
       themeSeeds,
       styleGuide,
       gates,
     );
-    const sceneAudit = this.sceneAuditor.audit(plan.sceneBlueprint, analysis.scenes);
+    const sceneAudit = this.sceneAuditor.audit(plan.sceneBlueprint, analysis.scenes, writerText);
     const blockingGate = buildBlockingGateStatus({ analysis, sceneAudit });
     if (blockingGate.blocking && !override) {
       throw new Error(
         `Blocking gate triggered: ${blockingGate.reasons.join("; ")}. Blocking scenes: ${blockingGate.blockingScenes.map((entry) => `${entry.sceneNumber}(${entry.issueTypes.join(", ")})`).join("; ")}. Re-run with --override to continue.`,
       );
     }
-    const reviewArtifacts = await this.writeDraftReviewArtifacts(bookId, targetChapterNumber, book, analysis, sceneAudit);
+
+    const reviewArtifacts = await this.writeWriterReviewArtifacts(bookId, targetChapterNumber, book, analysis, sceneAudit);
 
     return {
       bookId,
       chapterNumber: targetChapterNumber,
-      draftPath: draftResult.outputPath,
-      provider: draftResult.provider,
+      writerWorkingPath: writerResult.writerWorkingPath,
+      provider: writerResult.provider,
+      writerProvider: this.writerAgent.name,
+      analysisProvider: this.analysisEngine.name,
+      readerProvider: this.readerEngine.name,
       reviewPath: reviewArtifacts.reviewPath,
       revisionBriefPath: reviewArtifacts.revisionBriefPath,
       blockingGate,
+      finalProsePath: null,
     };
+  }
+
+  async draftCycle(bookId: string, targetChapterNumber: number, override = false): Promise<StorylabWriterCycleResult> {
+    return this.writerCycle(bookId, targetChapterNumber, override);
   }
 
   async reviseCycle(bookId: string, targetChapterNumber: number, override = false): Promise<StorylabRevisionCycleResult> {
     await this.store.ensureStoryDirs(bookId);
+    const ctx = await this.loadRevisionPassContext(bookId, targetChapterNumber);
+    const writerResult = await this.writerFromPlan(bookId, targetChapterNumber);
+    const initialWriterText = await this.store.loadWriterWorkingContent(bookId, targetChapterNumber);
+    const initialWriterDraft: ChapterDraft = {
+      chapterNumber: targetChapterNumber,
+      title: `第${targetChapterNumber}章工作稿`,
+      content: initialWriterText,
+      summary: "当前工作稿",
+      basedOnPlan: targetChapterNumber,
+    };
 
-    const [book, plan, characterSeeds, themeSeeds, styleGuide, gates, previousCharacterHistory, previousThemeHistory, previousMemory] = await Promise.all([
+    const pass = await this.executeRevisionPass(ctx, initialWriterDraft, override);
+    const finalProsePath = pass.postRevisionGate.blocking ? null : await this.store.writeFinalProse(bookId, pass.revisedDraft);
+
+    return {
+      bookId,
+      chapterNumber: targetChapterNumber,
+      initialWriterWorkingPath: writerResult.writerWorkingPath,
+      revisedWriterWorkingPath: pass.revisedWorkingPath,
+      reviewPath: pass.reviewPath,
+      revisedReviewPath: pass.revisedReviewPath,
+      comparisonPath: pass.comparisonPath,
+      provider: this.reviseEngine.name,
+      writerProvider: this.writerAgent.name,
+      analysisProvider: this.analysisEngine.name,
+      readerProvider: this.readerEngine.name,
+      reviseProvider: this.reviseEngine.name,
+      blockingGate: pass.blockingGate,
+      postRevisionGate: pass.postRevisionGate,
+      finalProsePath,
+      targetSceneNumbers: pass.revisionTrace.targetSceneNumbers,
+      actualRewrittenSceneNumbers: pass.revisionTrace.actualRewrittenSceneNumbers,
+      comparisonSceneNumbers: pass.revisionTrace.comparisonSceneNumbers,
+    };
+  }
+
+  async reviseUntilPass(
+    bookId: string,
+    targetChapterNumber: number,
+    options?: { override?: boolean; maxIterations?: number },
+  ): Promise<StorylabRevisionLoopResult> {
+    await this.store.ensureStoryDirs(bookId);
+    const maxIterations = options?.maxIterations ?? 3;
+    const override = options?.override ?? false;
+    const ctx = await this.loadRevisionPassContext(bookId, targetChapterNumber);
+    const writerResult = await this.writerFromPlan(bookId, targetChapterNumber);
+    let currentText = await this.store.loadWriterWorkingContent(bookId, targetChapterNumber);
+    let currentDraft: ChapterDraft = {
+      chapterNumber: targetChapterNumber,
+      title: `第${targetChapterNumber}章工作稿`,
+      content: currentText,
+      summary: "当前工作稿",
+      basedOnPlan: targetChapterNumber,
+    };
+
+    const iterations: StorylabRevisionLoopIteration[] = [];
+    let latestWriterWorkingPath = writerResult.writerWorkingPath;
+    let finalProsePath: string | null = null;
+    let stopReason = "达到最大迭代次数仍未过线";
+
+    for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
+      const pass = await this.executeRevisionPass(ctx, currentDraft, override);
+      latestWriterWorkingPath = pass.revisedWorkingPath;
+
+      iterations.push({
+        iteration,
+        beforeScores: pass.beforeAnalysis.readerReport.scores,
+        afterScores: pass.afterAnalysis.readerReport.scores,
+        blockingGate: pass.blockingGate,
+        postRevisionGate: pass.postRevisionGate,
+        targetSceneNumbers: pass.revisionTrace.targetSceneNumbers,
+        actualRewrittenSceneNumbers: pass.revisionTrace.actualRewrittenSceneNumbers,
+        comparisonSceneNumbers: pass.revisionTrace.comparisonSceneNumbers,
+        readerSummary: pass.afterAnalysis.readerReport.summary,
+        readerSuggestions: pass.afterAnalysis.readerReport.revisionSuggestions,
+      });
+
+      if (!pass.postRevisionGate.blocking) {
+        finalProsePath = await this.store.writeFinalProse(bookId, pass.revisedDraft);
+        stopReason = `第 ${iteration} 轮后所有 gate 已通过`;
+        return {
+          bookId,
+          chapterNumber: targetChapterNumber,
+          initialWriterWorkingPath: writerResult.writerWorkingPath,
+          latestWriterWorkingPath,
+          finalProsePath,
+          passed: true,
+          iterations,
+          stopReason,
+          maxIterations,
+          writerProvider: this.writerAgent.name,
+          analysisProvider: this.analysisEngine.name,
+          readerProvider: this.readerEngine.name,
+          reviseProvider: this.reviseEngine.name,
+        };
+      }
+
+      if (pass.revisionTrace.actualRewrittenSceneNumbers.length === 0) {
+        stopReason = `第 ${iteration} 轮未产生有效改写，停止继续循环`;
+        break;
+      }
+
+      const scoreDelta = [
+        pass.afterAnalysis.readerReport.scores.hook - pass.beforeAnalysis.readerReport.scores.hook,
+        pass.afterAnalysis.readerReport.scores.momentum - pass.beforeAnalysis.readerReport.scores.momentum,
+        pass.afterAnalysis.readerReport.scores.emotionalPeak - pass.beforeAnalysis.readerReport.scores.emotionalPeak,
+        pass.afterAnalysis.readerReport.scores.suspense - pass.beforeAnalysis.readerReport.scores.suspense,
+        pass.afterAnalysis.readerReport.scores.memorability - pass.beforeAnalysis.readerReport.scores.memorability,
+      ];
+      const anyImproved = scoreDelta.some((delta) => delta > 0);
+      const issueReduced = pass.beforeSceneAudit.issues.length > pass.afterSceneAudit.issues.length;
+      if (!anyImproved && !issueReduced) {
+        stopReason = `第 ${iteration} 轮没有带来有效提升，停止继续循环`;
+        break;
+      }
+
+      currentDraft = pass.revisedDraft;
+      currentText = pass.revisedDraft.content;
+      void currentText;
+    }
+
+    return {
+      bookId,
+      chapterNumber: targetChapterNumber,
+      initialWriterWorkingPath: writerResult.writerWorkingPath,
+      latestWriterWorkingPath,
+      finalProsePath,
+      passed: false,
+      iterations,
+      stopReason,
+      maxIterations,
+      writerProvider: this.writerAgent.name,
+      analysisProvider: this.analysisEngine.name,
+      readerProvider: this.readerEngine.name,
+      reviseProvider: this.reviseEngine.name,
+    };
+  }
+
+  private async loadRevisionPassContext(bookId: string, targetChapterNumber: number): Promise<RevisionPassContext> {
+    const [
+      book,
+      plan,
+      characterSeeds,
+      themeSeeds,
+      styleGuide,
+      gates,
+      previousCharacterHistory,
+      previousThemeHistory,
+      previousMemory,
+    ] = await Promise.all([
       this.store.loadBook(bookId),
       this.store.loadChapterPlan(bookId, targetChapterNumber),
       this.store.loadCharacterSeeds(bookId),
@@ -196,35 +530,46 @@ export class StorylabRunner {
       throw new Error(`No chapter plan found for chapter ${targetChapterNumber}. Run plan-next first.`);
     }
 
-    const draftResult = await this.draftFromPlan(bookId, targetChapterNumber);
-    const beforeDraftText = await this.store.loadDraftContent(bookId, targetChapterNumber);
-    const beforeDraft: ChapterDraft = {
+    return {
+      bookId,
       chapterNumber: targetChapterNumber,
-      title: plan.targetChapterNumber === targetChapterNumber ? "当前草稿" : `第${targetChapterNumber}章`,
-      content: beforeDraftText,
-      summary: "当前草稿",
-      basedOnPlan: targetChapterNumber,
-    };
-
-    const beforeAnalysis = await this.analyzeChapterText(
-      targetChapterNumber,
-      beforeDraft.content,
+      book,
+      plan,
       characterSeeds,
       themeSeeds,
       styleGuide,
       gates,
+      previousCharacterHistory,
+      previousThemeHistory,
+      previousMemory,
+    };
+  }
+
+  private async executeRevisionPass(
+    ctx: RevisionPassContext,
+    currentDraft: ChapterDraft,
+    override: boolean,
+  ): Promise<RevisionPassArtifacts> {
+    const beforeAnalysis = await this.analyzeChapterText(
+      ctx.chapterNumber,
+      currentDraft.content,
+      ctx.characterSeeds,
+      ctx.themeSeeds,
+      ctx.styleGuide,
+      ctx.gates,
     );
-    const beforeSceneAudit = this.sceneAuditor.audit(plan.sceneBlueprint, beforeAnalysis.scenes);
+    const beforeSceneAudit = this.sceneAuditor.audit(ctx.plan.sceneBlueprint, beforeAnalysis.scenes, currentDraft.content);
     const blockingGate = buildBlockingGateStatus({ analysis: beforeAnalysis, sceneAudit: beforeSceneAudit });
     if (blockingGate.blocking && !override) {
       throw new Error(
         `Blocking gate triggered: ${blockingGate.reasons.join("; ")}. Blocking scenes: ${blockingGate.blockingScenes.map((entry) => `${entry.sceneNumber}(${entry.issueTypes.join(", ")})`).join("; ")}. Re-run with --override to continue.`,
       );
     }
-    const beforeArtifacts = await this.writeDraftReviewArtifacts(
-      bookId,
-      targetChapterNumber,
-      book,
+
+    const beforeArtifacts = await this.writeWriterReviewArtifacts(
+      ctx.bookId,
+      ctx.chapterNumber,
+      ctx.book,
       beforeAnalysis,
       beforeSceneAudit,
     );
@@ -232,83 +577,85 @@ export class StorylabRunner {
     const targetSceneNumbers =
       blockingGate.blockingScenes.length > 0
         ? blockingGate.blockingScenes.map((entry) => entry.sceneNumber)
-        : beforeSceneAudit.issues.map((issue) => issue.sceneNumber);
+        : selectRevisionTargetScenes(ctx.plan, beforeSceneAudit, beforeAnalysis);
 
     const revisionResult = await this.reviseEngine.revise({
-      draft: beforeDraft,
-      plan,
+      draft: currentDraft,
+      plan: ctx.plan,
       analysis: beforeAnalysis,
       sceneAudit: beforeSceneAudit,
-      characterHistory: previousCharacterHistory,
-      themeHistory: previousThemeHistory,
-      styleGuide,
+      characterHistory: ctx.previousCharacterHistory,
+      themeHistory: ctx.previousThemeHistory,
+      styleGuide: ctx.styleGuide,
       targetSceneNumbers,
     });
     const revisedDraft = revisionResult.draft;
-    const revisedDraftPath = await this.store.writeRevisedDraft(bookId, revisedDraft);
+    const revisedWorkingPath = await this.store.writeRevisedWriterWorking(ctx.bookId, revisedDraft);
 
     const afterAnalysis = await this.analyzeChapterText(
-      targetChapterNumber,
+      ctx.chapterNumber,
       revisedDraft.content,
-      characterSeeds,
-      themeSeeds,
-      styleGuide,
-      gates,
+      ctx.characterSeeds,
+      ctx.themeSeeds,
+      ctx.styleGuide,
+      ctx.gates,
     );
-    const afterSceneAudit = this.sceneAuditor.audit(plan.sceneBlueprint, afterAnalysis.scenes);
+    const afterSceneAudit = this.sceneAuditor.audit(ctx.plan.sceneBlueprint, afterAnalysis.scenes, revisedDraft.content);
+    const postRevisionGate = buildBlockingGateStatus({ analysis: afterAnalysis, sceneAudit: afterSceneAudit });
     const revisedArtifacts = await this.writeRevisionArtifacts(
-      bookId,
-      targetChapterNumber,
-      book,
+      ctx.bookId,
+      ctx.chapterNumber,
+      ctx.book,
       afterAnalysis,
       afterSceneAudit,
     );
 
     const comparison = buildRevisionComparisonReport({
-      chapterNumber: targetChapterNumber,
+      chapterNumber: ctx.chapterNumber,
       before: beforeAnalysis,
       after: afterAnalysis,
       beforeSceneAudit,
       afterSceneAudit,
-      plan,
-      beforeDraftContent: beforeDraft.content,
+      plan: ctx.plan,
+      beforeDraftContent: currentDraft.content,
       afterDraftContent: revisedDraft.content,
       trace: revisionResult.trace,
     });
     const comparisonPath = await this.store.writeOutput(
-      bookId,
+      ctx.bookId,
       "revisions",
-      this.store.chapterFileName(targetChapterNumber, "comparison.json"),
+      this.store.chapterFileName(ctx.chapterNumber, "comparison.json"),
       JSON.stringify(comparison, null, 2),
     );
 
     await this.persistChapterAnalysis({
-      bookId,
-      book,
-      chapterNumber: targetChapterNumber,
+      bookId: ctx.bookId,
+      book: ctx.book,
+      chapterNumber: ctx.chapterNumber,
       analysis: afterAnalysis,
-      previousCharacterHistory,
-      previousThemeHistory,
-      previousMemory,
+      previousCharacterHistory: ctx.previousCharacterHistory,
+      previousThemeHistory: ctx.previousThemeHistory,
+      previousMemory: ctx.previousMemory,
     });
 
     return {
-      bookId,
-      chapterNumber: targetChapterNumber,
-      initialDraftPath: draftResult.outputPath,
-      revisedDraftPath,
+      beforeAnalysis,
+      beforeSceneAudit,
+      blockingGate,
+      targetSceneNumbers,
+      revisedDraft,
+      revisedWorkingPath,
+      afterAnalysis,
+      afterSceneAudit,
+      postRevisionGate,
+      comparisonPath,
       reviewPath: beforeArtifacts.reviewPath,
       revisedReviewPath: revisedArtifacts.reviewPath,
-      comparisonPath,
-      provider: this.reviseEngine.name,
-      blockingGate,
-      targetSceneNumbers: revisionResult.trace.targetSceneNumbers,
-      actualRewrittenSceneNumbers: revisionResult.trace.actualRewrittenSceneNumbers,
-      comparisonSceneNumbers: revisionResult.trace.comparisonSceneNumbers,
+      revisionTrace: revisionResult.trace,
     };
   }
 
-  private analyzeChapterText(
+  private async analyzeChapterText(
     chapterNumber: number,
     chapterText: string,
     characterSeeds: Awaited<ReturnType<ProjectStore["loadCharacterSeeds"]>>,
@@ -316,7 +663,7 @@ export class StorylabRunner {
     styleGuide: Awaited<ReturnType<ProjectStore["loadStyleGuide"]>>,
     gates: Awaited<ReturnType<ProjectStore["loadHumanGates"]>>,
   ): Promise<ChapterAnalysisBundle> {
-    return this.analysisEngine.analyze({
+    const coreAnalysis = await this.analysisEngine.analyze({
       chapterNumber,
       chapterText,
       characterSeeds,
@@ -324,6 +671,29 @@ export class StorylabRunner {
       styleGuide,
       gates,
     });
+
+    const readerReport = await this.readerEngine.review({
+      chapterNumber,
+      chapterText,
+      scenes: coreAnalysis.scenes,
+      characterStates: coreAnalysis.characterStates,
+      themeReport: coreAnalysis.themeReport,
+      styleReport: coreAnalysis.styleReport,
+    });
+    const gateDecision = this.gatekeeper.decide(chapterNumber, gates);
+    const revisionBrief = buildRevisionBrief({
+      chapterNumber,
+      readerReport,
+      characterStates: coreAnalysis.characterStates,
+      themeReport: coreAnalysis.themeReport,
+    });
+
+    return {
+      ...coreAnalysis,
+      readerReport,
+      gateDecision,
+      revisionBrief,
+    };
   }
 
   private async persistChapterAnalysis(params: {
@@ -413,17 +783,17 @@ export class StorylabRunner {
     ]);
   }
 
-  private async writeDraftReviewArtifacts(
+  private async writeWriterReviewArtifacts(
     bookId: string,
     chapterNumber: number,
     book: Awaited<ReturnType<ProjectStore["loadBook"]>>,
     analysis: ChapterAnalysisBundle,
     sceneAudit: SceneAuditReport,
-  ): Promise<DraftReviewArtifacts> {
+  ): Promise<WriterReviewArtifacts> {
     const reviewPath = await this.store.writeOutput(
       bookId,
-      "reviews/drafts",
-      this.store.chapterFileName(chapterNumber, "draft-review.json"),
+      "reviews/writer",
+      this.store.chapterFileName(chapterNumber, "writer-review.json"),
       JSON.stringify(
         {
           book,
@@ -443,8 +813,8 @@ export class StorylabRunner {
 
     const revisionBriefPath = await this.store.writeOutput(
       bookId,
-      "reviews/drafts",
-      this.store.chapterFileName(chapterNumber, "draft-revision-brief.md"),
+      "reviews/writer",
+      this.store.chapterFileName(chapterNumber, "writer-revision-brief.md"),
       analysis.revisionBrief,
     );
 

@@ -1,7 +1,14 @@
 {
-  "averageSentenceLength": 22.4,
-  "dialogueRatio": 0.13333333333333333,
-  "descriptionRatio": 0.7333333333333333,
-  "rhythmNote": "句长偏稳，需要注意是否压低了冲突速度",
-  "adherenceNote": "风格目标为“近距离第三人称，压迫感强，少解释，多让动作和环境渗出情绪”，当前对白占比 0.13，描写占比 0.73"
+  "averageSentenceLength": 16,
+  "dialogueRatio": 0.15,
+  "descriptionRatio": 0.35,
+  "rhythmNote": "节奏张弛有度，短句（如‘指尖触到火的瞬间，墙上的影子全部活了过来。’）营造紧张感，关键揭示使用稍长句承接情绪",
+  "adherenceNote": "高度符合‘近距离第三人称，压迫感强，少解释’的要求，情绪通过动作（‘疼得几乎跪下去’）和环境（‘墙皮像被热气反复舔过’）渗出",
+  "styleDriftPoints": [
+    "未发现明显偏离"
+  ],
+  "dialogueHomogeneitySpots": [
+    "未发现，林炽的沉默克制与沈砚的锋利追问形成鲜明对比"
+  ],
+  "descriptionBalanceNote": "描写密度适中，开篇环境描写和房间内景象有效营造氛围，动作场景描写简洁有力"
 }

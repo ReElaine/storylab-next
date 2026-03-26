@@ -1,8 +1,8 @@
-# Scene Rewrite Verification
+﻿# scene rewrite 验证
 
-这份文档对应第三轮修正意见里最关键的要求：
+这份文档对应的是 scene-level revise 的可追踪性验证：
 
-不是“看起来像只改了一个 scene”，而是要能严格证明：
+目标不是“看起来像只改了一个 scene”，而是能严格证明：
 
 - 只有一个 blocking scene
 - 只有这个 scene 被改
@@ -16,13 +16,13 @@
 
 runner 决定“准备修哪些 scene”。
 
-这是一组意图，不代表一定真的改到了。
+这是意图层，不代表一定真的改到了。
 
 ### actualRewrittenSceneNumbers
 
 revise engine 实际成功替换了哪些 scene。
 
-这是一组事实，必须由 revise engine 在执行替换时显式记录。
+这是事实层，必须在执行替换时显式记录。
 
 ### comparisonSceneNumbers
 
@@ -32,11 +32,11 @@ comparison 实际解释哪些 scene。
 
 `comparisonSceneNumbers === actualRewrittenSceneNumbers`
 
-也就是说，comparison 不再用 issue 并集冒充“本次改写的 scene”。
+也就是说，comparison 不再用 issue 并集冒充“本次实际改写 scene”。
 
-## 2. 当前新增的证据字段
+## 2. 当前用于证明的证据字段
 
-在 `comparison.json` 和 revise trace 里，当前会明确输出：
+当前在 revise trace 和 `comparison.json` 中会明确输出：
 
 - `targetSceneNumbers`
 - `actualRewrittenSceneNumbers`
@@ -45,7 +45,7 @@ comparison 实际解释哪些 scene。
 - `reviewedButNotRewrittenSceneNumbers`
 - `sceneRewriteMetadata`
 
-其中 `sceneRewriteMetadata` 会记录：
+其中 `sceneRewriteMetadata` 当前会记录：
 
 - `reason`
 - `strategy`
@@ -63,9 +63,9 @@ comparison 实际解释哪些 scene。
 npm test
 ```
 
-## 4. 验证样例内容
+## 4. 验证样例结构
 
-这个样例是一个受控章节文本，结构如下：
+当前样例是一个受控章节文本，结构如下：
 
 ```text
 prelude
@@ -83,7 +83,7 @@ postlude
 
 ## 5. 核心断言
 
-测试里会严格验证：
+测试会严格验证：
 
 1. blocking gate 只命中 scene 2
 2. `targetSceneNumbers === [2]`
@@ -98,7 +98,7 @@ postlude
 
 ## 6. 对 comparison 的要求
 
-当前 comparison 已经不再只做模板化解释，而是建立在这几层信息交叉上：
+当前 comparison 不再只做模板化解释，而是建立在以下信息交叉之上：
 
 - 原 scene 文本
 - revised scene 文本
@@ -106,7 +106,7 @@ postlude
 - 实际采用的 rewrite strategy
 - revise 后 assessment
 
-每个 `sceneChanges` 条目至少包含：
+每个 `sceneChanges` 至少包含：
 
 - `beforeProblems`
 - `appliedRewriteStrategy`
@@ -117,31 +117,30 @@ postlude
 
 ## 7. scene-text 边界修复
 
-这轮同时修复了 `scene-text.ts` 的边界问题。
+这套验证还覆盖了 `scene-text.ts` 的边界稳定性。
 
-当前 parser 会明确区分：
+当前 parser 明确区分：
 
 - `prelude`
 - `scene blocks`
 - `postlude`
 
-并且 `replaceSceneUnits()` 会保证：
+并且 `replaceSceneUnits()` 保证：
 
 - prelude 原样保留
 - 未改 scene 原样保留
 - postlude 原样保留
 
-这部分由：
+对应代码与测试：
 
 - [src/core/utils/scene-text.ts](/C:/Working/storylab-next/src/core/utils/scene-text.ts)
 - [tests/scene-text.test.mjs](/C:/Working/storylab-next/tests/scene-text.test.mjs)
 
-共同验证。
-
 ## 8. 当前结论
 
-到这一步，系统才算真正跨过了“看起来像 scene-level revise”的门槛，进入：
+到这一步，系统才真正跨过了“看起来像 scene-level revise”的门槛，进入：
 
 `可以严格证明只改了某一个 scene`
 
 这也是后续继续增强 character-driven rewrite、theme-driven rewrite、style local rewrite 的基础。
+

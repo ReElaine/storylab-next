@@ -1,302 +1,201 @@
-# storylab-next 架构分析
+﻿# storylab-next 架构分析
 
 ## 1. 项目定位
 
-`storylab-next` 是一个独立的小说写作增强架构项目。
+`storylab-next` 是一个独立的小说写作系统原型。当前关注点是把多 agent 写作主链做实：
 
-它参考了 Inkos 一类系统中已经被证明有效的做法，例如文件系统状态、pipeline 编排、模块职责拆分，但并不依附原项目，也不复用原仓库结构。它的目标不是“在旧系统上加几个模块”，而是重构一套更适合高质量小说生产的新系统。
+- 文件系统状态外置
+- pipeline runner 统一编排
+- writer / analysis / reader / revise 解耦
+- 审计与修订闭环
+- 自动循环修订与最终正文导出
 
-当前阶段的重点不是直接追求“一键出成品”，而是先把影响产出质量的中间层搭清楚：
+当前重点不是“一键出成品”，而是把真正影响正文质量的中间层做硬：
 
-- 读者体验评审
-- 角色动态状态
-- 场景级规划
-- 主题推进
-- 风格约束
-- 人类介入点
-- 跨章累计状态
+- scene planning
+- character-driven conflict
+- theme-driven tension
+- style control
+- scene-level revise
+- rewrite traceability
+- rewrite effectiveness
 
 ## 2. 为什么独立实现
 
-这次没有继续沿用 Inkos 的 monorepo/workspace 方式，而是采用单包 TypeScript 项目，主要出于两个原因：
+`storylab-next` 没有沿用原 monorepo/workspace 方式，而是采用单包 TypeScript 项目，原因有两个：
 
-1. 之前在参考仓库的实际调试中，CLI package 出现过 workspace 解析问题，容易把实验性架构工作拖进工程联动问题里。
-2. 当前阶段更适合先验证“架构闭环”是否成立，而不是先承担复杂仓库组织成本。
+1. 之前在参考仓库的实际调试中，workspace 解析带来过工程联动问题，不适合新架构快速实验。
+2. 当前阶段更需要验证“主链是否成立、证据链是否可靠”，而不是先承担复杂仓库组织成本。
 
-因此 `storylab-next` 目前采用：
+因此当前项目采用：
 
 - 单包 TypeScript
 - 相对路径导入
 - 无 workspace alias
-- 无对外部核心包的强依赖
+- 无对原项目核心包的依赖
 
-这样做的好处是结构简单、编译路径短、调试成本低，便于快速验证新架构。
-
-## 3. 顶层目录
+## 3. 当前目录摘要
 
 ```text
 storylab-next/
   docs/
-    architecture-analysis.md
-    design.md
-    roadmap.md
-    usage.md
-    progress-review.md
   src/
     cli/
-      main.ts
     core/
       llm/
-        analysis-engine.ts
-        draft-engine.ts
-        openai-shared.ts
-        planning-engine.ts
       modules/
-        chapter-planner.ts
-        character-engine.ts
-        draft-generator.ts
-        history-builder.ts
-        human-review-gates.ts
-        reader-experience-critic.ts
-        revision-brief.ts
-        scene-planner.ts
-        style-engine.ts
-        theme-tracker.ts
       pipeline/
-        storylab-runner.ts
       project/
-        demo.ts
-        project-store.ts
       utils/
-        text.ts
       types.ts
+  tests/
   demo-workspace/
   README.md
   package.json
   tsconfig.json
 ```
 
+核心代码路径：
+
+- CLI 入口：[main.ts](/C:/Working/storylab-next/src/cli/main.ts)
+- 主编排器：[storylab-runner.ts](/C:/Working/storylab-next/src/core/pipeline/storylab-runner.ts)
+- 状态存取：[project-store.ts](/C:/Working/storylab-next/src/core/project/project-store.ts)
+- 引擎层：[llm](/C:/Working/storylab-next/src/core/llm)
+- 叙事模块层：[modules](/C:/Working/storylab-next/src/core/modules)
+
 ## 4. 系统分层
 
 ### CLI 层
-
-入口文件：
-
-- [main.ts](/C:/Working/storylab-next/src/cli/main.ts)
 
 职责：
 
 - 解析命令
 - 初始化 demo 工作区
 - 调用 runner
-- 输出 JSON 结果
+- 返回运行结果
 
 ### Pipeline 层
 
-核心文件：
-
-- [storylab-runner.ts](/C:/Working/storylab-next/src/core/pipeline/storylab-runner.ts)
-
 职责：
 
-- 统一编排 `run / plan-next / draft-from-plan / draft-cycle`
-- 调度 store、engines、modules
-- 负责落盘顺序与结果聚合
+- 编排 `run / plan-next / write-from-plan / writer-cycle / revise-cycle / revise-until-pass`
+- 统一调度 engine、store、modules
+- 组织 analysis、writer、reader、revise、comparison、persist 顺序
 
 ### Store 层
 
-核心文件：
-
-- [project-store.ts](/C:/Working/storylab-next/src/core/project/project-store.ts)
-
 职责：
 
-- 读写书籍、章节、规划、草稿与 story 子目录
-- 管理输出目录结构
-- 提供统一文件命名约定
+- 读写书籍、章节、planning、writer working、review、revision
+- 维护 `story/` 子目录状态
+- 维护 writer working / revised writer working 输出
 
 ### Module 层
 
-位于：
-
-- [modules](/C:/Working/storylab-next/src/core/modules)
-
 职责：
 
-- 每个模块只负责一类叙事能力
-- heuristic 版本的分析、规划、草稿生成都在这里实现
+- 承担 heuristic 叙事能力
+- 提供 scene / character / theme / style / review 等模块化能力
 
 ### Engine 层
 
-位于：
-
-- [llm](/C:/Working/storylab-next/src/core/llm)
-
 职责：
 
-- 给 `run / plan-next / draft-from-plan` 提供统一的可插拔引擎接口
-- 当前支持 `heuristic` 与 `openai`
+- 对外提供可切换引擎接口
+- 当前支持 `heuristic / openai`
+- 让 analysis / planning / writer / reader / revise 可以按环节切换
 
-## 5. 当前状态目录设计
+## 5. 状态目录设计
 
-项目延续了“文件系统即状态层”的思路，但把新架构能力拆成了新的 story 子目录：
+项目延续“文件系统即状态层”的思路，当前核心目录为：
 
 ```text
 books/<bookId>/story/
   scenes/
   characters/
   themes/
-  reviews/
-    drafts/
   style/
+  reviews/
+    writer/
+    revisions/
   human-gates/
   memory/
   planning/
-books/<bookId>/drafts/
+  revisions/
+books/<bookId>/story/writers-internal/
+books/<bookId>/story/revisions/internal/
+books/<bookId>/final/
 ```
 
-这样做的价值是：
+这套结构的价值在于：
 
-- 各模块状态边界清楚
-- 人类可直接查看和编辑
+- 模块状态边界清楚
+- 人类可以直接审阅中间状态
 - heuristic 与 LLM 输出可以共存
-- 后续更容易扩展 scene history、scene auditor、revision loop
+- comparison / verification / traceability 可以独立落盘
 
 ## 6. 当前主流程
 
 ### `run`
 
-1. 读取章节正文与基础配置
-2. 调用 analysis engine
-3. 产出：
-   - scene plan
-   - character state
-   - theme report
-   - style report
-   - reader experience report
-   - revision brief
-   - gate decision
-4. 合并跨章状态：
-   - character history
-   - theme history
-   - story memory
-5. 统一落盘
+`chapter text -> analysis -> review outputs -> history merge -> persist`
 
 ### `plan-next`
 
-1. 读取累计状态
-2. 调用 planning engine
-3. 输出下一章 `chapter-plan.json`
+`history + memory -> chapter plan`
 
-### `draft-from-plan`
+### `write-from-plan`
 
-1. 读取 chapter plan
-2. 读取人物历史与主题历史
-3. 调用 draft engine
-4. 输出草稿 markdown
+`chapter plan + history -> writer working`
 
-### `draft-cycle`
+### `writer-cycle`
 
-1. 调用 `draft-from-plan`
-2. 读取已落盘草稿正文
-3. 再次走 analysis engine
-4. 输出草稿评审结果
-5. 输出草稿 revision brief
+`writer working -> analysis -> reader -> scene audit -> blocking gate -> review artifacts`
 
-## 7. 已完成的关键增强能力
+### `revise-cycle`
 
-### Reader Experience Critic
+`writer working -> before analysis -> reader -> scene audit -> scene-level revise -> re-analysis -> re-reader -> comparison -> persist`
 
-已具备：
+## 7. 已落地的关键能力
 
-- 钩子感评分
-- 推进感评分
-- 情绪峰值评分
-- 悬念评分
-- 记忆点评分
-- 风险与修订建议
+已经落地的核心能力包括：
 
-### Character Engine
+- Reader Experience Critic
+- Character Engine
+- Scene Planner
+- Theme Tracker
+- Style Engine
+- Human Review Gates
+- Scene Auditor
+- scene-level revise
+- rewrite traceability
+- rewrite effectiveness 第一版
 
-已具备：
+## 8. 当前优势
 
-- 当前欲望
-- 当前恐惧
-- 当前误判
-- 最近决策
-- 决策代价
-- 关系变化
-- 弧线进度
+- 独立项目结构简单，便于持续试验
+- scene planning、writer、revise 已形成真实主链
+- scene-level rewrite 已可追踪、可验证
+- comparison 已开始区分事实层与解释层
+- LLM 接入已打通，但不会破坏 deterministic 证据链
 
-### Scene Planner
+## 9. 当前边界
 
-已具备：
+当前还不是成品级写作系统，主要边界包括：
 
-- 场景拆分
-- POV
-- 目标
-- 冲突
-- 转折
-- 结果
-- 新信息
-- 情绪变化
+- 默认仍以 heuristic 为主，不是默认全链路 LLM
+- LLM prompt / schema 仍是第一版
+- rewrite effectiveness 还在继续强化
+- human gate 还没有形成完整协作工作流
+- style local rewrite 还可以继续做细
+- 更成熟的收益判断和 regression detection 仍未完成
 
-### Theme Tracker
+## 10. 现在最适合看哪些文档
 
-已具备：
+- 阶段状态：[项目阶段总览](/C:/Working/storylab-next/docs/project-stages.md)
+- LLM 现状：[LLM 接入现状对照表](/C:/Working/storylab-next/docs/llm-adoption-matrix.md)
+- 主链调用：[调用链说明](/C:/Working/storylab-next/docs/call-flows.md)
+- revise 主链：[修订闭环](/C:/Working/storylab-next/docs/revision-loop.md)
+- 当前主阶段：[改写有效性](/C:/Working/storylab-next/docs/rewrite-effectiveness.md)
 
-- theme
-- anti-theme
-- value conflict
-- 主题信号计数
-- 反主题信号计数
-- 基础解释
 
-### Style Engine
-
-已具备：
-
-- 平均句长
-- 对白占比
-- 描写占比
-- 节奏提示
-- 风格一致性说明
-
-### Human Review Gates
-
-已具备：
-
-- gate 配置
-- 指定章节触发
-- 当前是否命中
-- 下一个人类介入点提示
-
-## 8. 当前架构的优点
-
-- 工程结构简单，便于快速迭代
-- 文件状态清晰，便于人工检查
-- 章节分析、章节规划、草稿生成已经形成主链
-- `run / plan-next / draft-from-plan` 都已具备可插拔引擎层
-- 为后续接入更强 LLM 或混合模式留出了稳定接口
-
-## 9. 当前不足
-
-当前项目仍是“高质量写作架构原型”，不是成品系统。主要不足包括：
-
-- LLM prompt/schema 还只是第一版
-- scene history 还未实现
-- scene auditor 还未实现
-- 风格控制还偏分析，未形成强执行
-- human gate 还未真正阻断流程
-- revision loop 还未形成完整闭环
-- 正文生成质量仍有模板感
-
-## 10. 当前最适合继续强化的方向
-
-最值得继续投入的是：
-
-1. 强化 `OpenAIAnalysisEngine` 的评审质量
-2. 强化 `OpenAIPlanningEngine` 的章节规划质量
-3. 提升 `OpenAIDraftWriter` 的正文质量
-4. 增加 scene history 与 scene auditor
-5. 把 human gate 做成真正的中断式工作流

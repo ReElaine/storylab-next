@@ -1,4 +1,5 @@
 import type { SceneAuditIssue, SceneAuditReport, SceneBlueprintItem, ScenePlanItem } from "../types.js";
+import { parseSceneDocument } from "../utils/scene-text.js";
 
 function normalize(value: string): string {
   return value.trim();
@@ -8,12 +9,41 @@ function hasSignal(value: string): boolean {
   return normalize(value).length > 0 && !normalize(value).includes("待补充");
 }
 
+function buildSceneTextMap(chapterText: string): ReadonlyMap<number, string> {
+  const parsed = parseSceneDocument(chapterText);
+  return new Map(parsed.scenes.map((scene) => [scene.sceneNumber, scene.content]));
+}
+
+function extractSemanticHints(value: string): ReadonlyArray<string> {
+  return value
+    .split(/[，。、“”‘’：:；;（）()、\/\s-]+/u)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length >= 2 && entry !== "必须" && entry !== "场景" && entry !== "角色");
+}
+
+function hasPlannedSignal(text: string, ...plannedValues: ReadonlyArray<string>): boolean {
+  return plannedValues.some((value) => {
+    if (!value.trim()) {
+      return false;
+    }
+
+    if (text.includes(value.trim())) {
+      return true;
+    }
+
+    const hints = extractSemanticHints(value);
+    return hints.some((hint) => text.includes(hint));
+  });
+}
+
 export class SceneAuditor {
   audit(
     planScenes: ReadonlyArray<SceneBlueprintItem>,
     actualScenes: ReadonlyArray<ScenePlanItem>,
+    chapterText = "",
   ): SceneAuditReport {
     const issues: SceneAuditIssue[] = [];
+    const sceneTextMap = chapterText.trim().length > 0 ? buildSceneTextMap(chapterText) : new Map<number, string>();
 
     if (actualScenes.length < planScenes.length) {
       issues.push({
@@ -44,7 +74,7 @@ export class SceneAuditor {
           sceneNumber: planned.sceneNumber,
           severity: "high",
           problem: "场景冲突不足",
-          recommendation: `补强阻力与对抗，让冲突对齐计划中的要求：${planned.conflict}`,
+          recommendation: `补强阻力与对抗，让冲突对齐计划要求：${planned.conflict}`,
         });
       }
 
@@ -67,7 +97,12 @@ export class SceneAuditor {
       }
 
       const joined = actual.sourceParagraphs.join("\n");
-      if (!joined.includes("决定") && !joined.includes("选择")) {
+      const fullSceneText = sceneTextMap.get(planned.sceneNumber) ?? joined;
+
+      const hasDecisionSignal =
+        /决定|选择|反击|反抗|夺回|出手|动手|顶回|抢回|不再解释|接招|迎上去|忍住|领受|伸出手|攥紧|盖住|没退/u.test(fullSceneText) ||
+        hasPlannedSignal(fullSceneText, planned.decision, planned.goal, planned.turn);
+      if (!hasDecisionSignal) {
         issues.push({
           sceneNumber: planned.sceneNumber,
           severity: "high",
@@ -76,7 +111,10 @@ export class SceneAuditor {
         });
       }
 
-      if (!joined.includes("代价") && !joined.includes("后果")) {
+      const hasCostSignal =
+        /代价|后果|记恨|断供|危险|打压|眼中钉|结怨|没退路|付出|反噬|盯上|收回|罪名|克扣|默认|践踏/u.test(fullSceneText) ||
+        hasPlannedSignal(fullSceneText, planned.cost, planned.result, planned.relationshipChange);
+      if (!hasCostSignal) {
         issues.push({
           sceneNumber: planned.sceneNumber,
           severity: "high",
@@ -85,12 +123,20 @@ export class SceneAuditor {
         });
       }
 
-      if (!joined.includes(planned.valuePositionA) && !joined.includes(planned.valuePositionB)) {
+      const hasThemeSignal =
+        hasPlannedSignal(
+          fullSceneText,
+          planned.thematicTension,
+          planned.valuePositionA,
+          planned.valuePositionB,
+          planned.sceneStance,
+        ) || /忍耐|反抗|代价|命运|活路|后果|价值|规则/u.test(fullSceneText);
+      if (!hasThemeSignal) {
         issues.push({
           sceneNumber: planned.sceneNumber,
           severity: "medium",
           problem: "场景只有剧情推进，没有主题冲突",
-          recommendation: `让价值对立“${planned.valuePositionA} / ${planned.valuePositionB}”通过行为或对话显形。`,
+          recommendation: `让价值对立“${planned.valuePositionA} / ${planned.valuePositionB}”通过行为或对白显形。`,
         });
       }
 
@@ -109,7 +155,7 @@ export class SceneAuditor {
           sceneNumber: planned.sceneNumber,
           severity: "low",
           problem: "场景出现重复信息",
-          recommendation: "去掉重复揭示，保留一次最有效的呈现。",
+          recommendation: "去掉重复揭示，只保留一次最有效的呈现。",
         });
       }
     }

@@ -1,0 +1,47 @@
+{
+  "chapterNumber": 1,
+  "characterStates": [
+    {
+      "name": "林凡",
+      "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+      "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+      "misbelief": "只要自己再忍一忍，总能等来一次公平机会",
+      "recentDecision": "林凡做出了带风险的明确选择",
+      "decisionCost": "身体代价已经显性出现",
+      "relationshipShift": [
+        "林凡与赵执事从顺从转对峙向高压协作移动",
+        "林凡与陈师兄从被欺压转反击向高压协作移动"
+      ],
+      "arcProgress": "角色弧线处于起步阶段",
+      "presentInChapter": true
+    },
+    {
+      "name": "赵执事",
+      "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+      "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+      "misbelief": "弱者天生只配服从，谁敢反抗就必须被压断脊梁",
+      "recentDecision": "赵执事做出了带风险的明确选择",
+      "decisionCost": "身体代价已经显性出现",
+      "relationshipShift": [
+        "赵执事与林凡从轻视转记恨向高压协作移动",
+        "赵执事与陈师兄从偏帮与利用向高压协作移动"
+      ],
+      "arcProgress": "角色弧线处于起步阶段",
+      "presentInChapter": true
+    },
+    {
+      "name": "陈师兄",
+      "desire": "靠踩底层弟子维持地位和优越感",
+      "fear": "被比自己更弱的人当众顶回来，坏了名声",
+      "misbelief": "只要有背景和靠山，就能把冲突变成自己的优势",
+      "recentDecision": "陈师兄做出了带风险的明确选择",
+      "decisionCost": "身体代价已经显性出现",
+      "relationshipShift": [
+        "陈师兄与林凡从羞辱转撕破脸向高压协作移动",
+        "陈师兄与赵执事从依附与借势向高压协作移动"
+      ],
+      "arcProgress": "角色弧线处于起步阶段",
+      "presentInChapter": true
+    }
+  ]
+}

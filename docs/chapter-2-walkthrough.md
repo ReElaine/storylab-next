@@ -1,4 +1,4 @@
-# Chapter 2 修订示例
+﻿# Chapter 2 修订示例
 
 这份文档用 demo 中的第 2 章说明：
 
@@ -11,15 +11,15 @@
 
 原始草稿：
 
-- [0002_代价开始说话.md](/C:/Working/storylab-next/demo-workspace/books/ember-fall/drafts/0002_代价开始说话.md)
+- [0002_代价开始说话.md](/C:/Working/storylab-next/demo-workspace/books/ember-fall/final/0002_代价开始说话.md)
 
 revise 前评审：
 
-- [chapter-0002.draft-review.json](/C:/Working/storylab-next/demo-workspace/books/ember-fall/story/reviews/drafts/chapter-0002.draft-review.json)
+- [chapter-0002.writer-review.json](/C:/Working/storylab-next/demo-workspace/books/ember-fall/story/reviews/final/chapter-0002.writer-review.json)
 
 revise 后草稿：
 
-- [0002_当前草稿.revised.md](/C:/Working/storylab-next/demo-workspace/books/ember-fall/drafts/revised/0002_当前草稿.revised.md)
+- [0002_当前草稿.revised.md](/C:/Working/storylab-next/demo-workspace/books/ember-fall/final/revised/0002_当前草稿.revised.md)
 
 comparison：
 
@@ -87,17 +87,17 @@ comparison：
 
 角色决策：
 
-- 看 revised draft 中每个场景的主动行动与代价兑现
+- 看 revised writer working 中每个场景的主动行动与代价兑现
 
 主题冲突：
 
 - 看 `comparison.json` 里的 `themeChange`
-- 看 revised draft 里冲突是否通过行为和对白体现
+- 看 revised writer working 里冲突是否通过行为和对白体现
 
 风格变化：
 
 - 看 `comparison.json` 里的 `styleChange`
-- 看 revised draft 里节奏是否更紧、对白是否更分化
+- 看 revised writer working 里节奏是否更紧、对白是否更分化
 
 ## 7. 这份示例证明了什么
 
@@ -118,3 +118,5 @@ comparison：
 但这份示例已经足够证明：
 
 系统开始把中间层变成“会影响正文”的硬约束，而不是只增加报告。
+
+

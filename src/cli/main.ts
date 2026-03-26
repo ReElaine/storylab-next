@@ -9,8 +9,9 @@ function printUsage(): void {
       "  storylab-next init-demo <workspaceDir>",
       "  storylab-next run <workspaceDir> <bookId> <chapterNumber>",
       "  storylab-next plan-next <workspaceDir> <bookId> <targetChapterNumber>",
-      "  storylab-next draft-from-plan <workspaceDir> <bookId> <targetChapterNumber>",
-      "  storylab-next draft-cycle <workspaceDir> <bookId> <targetChapterNumber> [--override]",
+      "  storylab-next write-from-plan <workspaceDir> <bookId> <targetChapterNumber>",
+      "  storylab-next writer-cycle <workspaceDir> <bookId> <targetChapterNumber> [--override]",
+      "  storylab-next revise-until-pass <workspaceDir> <bookId> <targetChapterNumber> [--override] [--max-iterations N]",
       "  storylab-next revise-cycle <workspaceDir> <bookId> <targetChapterNumber> [--override]",
       "",
     ].join("\n"),
@@ -76,7 +77,7 @@ export async function main(args: string[]): Promise<void> {
     return;
   }
 
-  if (command === "draft-from-plan") {
+  if (command === "draft-from-plan" || command === "write-from-plan") {
     const [workspaceDir, bookId, chapterNumberRaw] = rest;
     if (!workspaceDir || !bookId || !chapterNumberRaw) {
       printUsage();
@@ -90,12 +91,12 @@ export async function main(args: string[]): Promise<void> {
     }
 
     const runner = new StorylabRunner(resolve(workspaceDir));
-    const result = await runner.draftFromPlan(bookId, targetChapterNumber);
+    const result = await runner.writeFromPlan(bookId, targetChapterNumber);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
   }
 
-  if (command === "draft-cycle") {
+  if (command === "draft-cycle" || command === "writer-cycle") {
     const [workspaceDir, bookId, chapterNumberRaw, ...flags] = rest;
     if (!workspaceDir || !bookId || !chapterNumberRaw) {
       printUsage();
@@ -109,7 +110,7 @@ export async function main(args: string[]): Promise<void> {
     }
 
     const runner = new StorylabRunner(resolve(workspaceDir));
-    const result = await runner.draftCycle(bookId, targetChapterNumber, flags.includes("--override"));
+    const result = await runner.writerCycle(bookId, targetChapterNumber, flags.includes("--override"));
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
   }
@@ -129,6 +130,33 @@ export async function main(args: string[]): Promise<void> {
 
     const runner = new StorylabRunner(resolve(workspaceDir));
     const result = await runner.reviseCycle(bookId, targetChapterNumber, flags.includes("--override"));
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    return;
+  }
+
+  if (command === "revise-until-pass") {
+    const [workspaceDir, bookId, chapterNumberRaw, ...flags] = rest;
+    if (!workspaceDir || !bookId || !chapterNumberRaw) {
+      printUsage();
+      process.exitCode = 1;
+      return;
+    }
+
+    const targetChapterNumber = Number.parseInt(chapterNumberRaw, 10);
+    if (Number.isNaN(targetChapterNumber)) {
+      throw new Error(`Invalid chapter number: ${chapterNumberRaw}`);
+    }
+
+    const maxIndex = flags.findIndex((flag) => flag === "--max-iterations");
+    const maxIterations = maxIndex >= 0
+      ? Number.parseInt(flags[maxIndex + 1] ?? "3", 10)
+      : 3;
+
+    const runner = new StorylabRunner(resolve(workspaceDir));
+    const result = await runner.reviseUntilPass(bookId, targetChapterNumber, {
+      override: flags.includes("--override"),
+      maxIterations: Number.isNaN(maxIterations) ? 3 : maxIterations,
+    });
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
   }

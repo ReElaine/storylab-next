@@ -7,7 +7,8 @@ export function buildRevisionBrief(params: {
   readonly themeReport: ThemeReport;
 }): string {
   const activeCharacters = params.characterStates.filter((entry) => entry.presentInChapter);
-  const activeTheme = params.themeReport.activeThemes[0];
+  const activeThemes = Array.isArray(params.themeReport.activeThemes) ? params.themeReport.activeThemes : [];
+  const activeTheme = activeThemes[0];
 
   return [
     `# Chapter ${params.chapterNumber} Revision Brief`,

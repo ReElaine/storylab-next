@@ -1,0 +1,56 @@
+[
+  {
+    "name": "林凡",
+    "role": "主角",
+    "baselineDesire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+    "baselineFear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+    "baselineMisbelief": "只要自己再忍一忍，总能等来一次公平机会",
+    "voiceNotes": "前半章少说话，后半章短促而硬，动作快于解释。",
+    "relationshipMap": [
+      {
+        "target": "赵执事",
+        "status": "顺从转对峙"
+      },
+      {
+        "target": "陈师兄",
+        "status": "被欺压转反击"
+      }
+    ]
+  },
+  {
+    "name": "赵执事",
+    "role": "外门执事 / 主要压迫源",
+    "baselineDesire": "维持资源向强者和自己派系倾斜的既得秩序",
+    "baselineFear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+    "baselineMisbelief": "弱者天生只配服从，谁敢反抗就必须被压断脊梁",
+    "voiceNotes": "说话像判决，站在规矩和权力一边，不解释情绪，只下结论。",
+    "relationshipMap": [
+      {
+        "target": "林凡",
+        "status": "轻视转记恨"
+      },
+      {
+        "target": "陈师兄",
+        "status": "偏帮与利用"
+      }
+    ]
+  },
+  {
+    "name": "陈师兄",
+    "role": "外门弟子 / 直接冲突对象",
+    "baselineDesire": "靠踩底层弟子维持地位和优越感",
+    "baselineFear": "被比自己更弱的人当众顶回来，坏了名声",
+    "baselineMisbelief": "只要有背景和靠山，就能把冲突变成自己的优势",
+    "voiceNotes": "对白带羞辱感和挑衅感，遇到真正反击时会急躁。",
+    "relationshipMap": [
+      {
+        "target": "林凡",
+        "status": "羞辱转撕破脸"
+      },
+      {
+        "target": "赵执事",
+        "status": "依附与借势"
+      }
+    ]
+  }
+]

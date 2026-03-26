@@ -2,7 +2,7 @@
   "name": "storylab-next",
   "version": "0.1.0",
   "private": true,
-  "description": "Standalone experimental novel-writing architecture inspired by Inkos",
+  "description": "Standalone multi-agent novel-writing architecture with writer, analysis, reader, and revise loops",
   "type": "module",
   "bin": {
     "storylab-next": "./dist/index.js"

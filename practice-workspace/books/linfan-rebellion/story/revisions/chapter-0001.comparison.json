@@ -1,0 +1,205 @@
+{
+  "chapterNumber": 1,
+  "readerScoreDelta": {
+    "hook": 0,
+    "momentum": 0,
+    "emotionalPeak": 0,
+    "suspense": 0,
+    "memorability": 0
+  },
+  "sceneIssueDelta": 0,
+  "rewriteFacts": {
+    "targetSceneNumbers": [
+      3,
+      4
+    ],
+    "actualRewrittenSceneNumbers": [
+      3
+    ],
+    "comparisonSceneNumbers": [
+      3
+    ],
+    "unchangedSceneNumbers": [
+      1,
+      2,
+      4
+    ],
+    "reviewedButNotRewrittenSceneNumbers": [],
+    "sceneRewriteMetadata": {
+      "3": {
+        "reason": [
+          "该 scene 被选中进行局部重写"
+        ],
+        "strategy": [
+          "让 林凡 主动推动场景，并明确执行决策：林凡决定当众反击，哪怕从这一刻起再也回不到低头求活的旧路",
+          "让代价在场景中可见：这次胜利会让赵执事把他列为重点打压对象",
+          "用行为或对话体现关系变化：林凡与旁观弟子的关系从可被无视转成必须重新评估",
+          "把价值冲突写进动作或对白：继续忍让保住表面平静 vs 用反抗抢回一点活路",
+          "遵守风格指令：这是全章最强冲突点，动作密度最高，句子更短，爽点要直接，不能用旁白替代爆发。",
+          "给第二场景增加一个更具体的读者预期问题，例如沈砚为什么提前知道代价",
+          "把主角做决定前的内在拉扯再压缩半拍，让伸手动作更像不可撤回的跃迁",
+          "在结尾悬念前加一小处记忆点型意象，强化章节辨识度"
+        ]
+      }
+    },
+    "sceneAlignment": {
+      "mappingBasis": "comparison 基于 draft 文本中的 scene marker 建立映射；re-analysis 的 scene 数量单独记录。",
+      "beforeParsedSceneNumbers": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "afterParsedSceneNumbers": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "beforeAnalysisSceneNumbers": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "afterAnalysisSceneNumbers": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "stableByParsedScenes": true,
+      "stableByAnalysisScenes": true
+    }
+  },
+  "rewriteInterpretation": {
+    "summary": "本轮修订没有带来明显指标提升，需要重新审视 revise brief。",
+    "improved": [],
+    "unresolved": [
+      "情绪峰值仍未明显提升",
+      "记忆点仍可继续强化"
+    ],
+    "benefitSummary": [
+      "no_meaningful_gain"
+    ]
+  },
+  "summary": "本轮修订没有带来明显指标提升，需要重新审视 revise brief。",
+  "improved": [],
+  "unresolved": [
+    "情绪峰值仍未明显提升",
+    "记忆点仍可继续强化"
+  ],
+  "targetSceneNumbers": [
+    3,
+    4
+  ],
+  "actualRewrittenSceneNumbers": [
+    3
+  ],
+  "comparisonSceneNumbers": [
+    3
+  ],
+  "unchangedSceneNumbers": [
+    1,
+    2,
+    4
+  ],
+  "reviewedButNotRewrittenSceneNumbers": [],
+  "sceneRewriteMetadata": {
+    "3": {
+      "reason": [
+        "该 scene 被选中进行局部重写"
+      ],
+      "strategy": [
+        "让 林凡 主动推动场景，并明确执行决策：林凡决定当众反击，哪怕从这一刻起再也回不到低头求活的旧路",
+        "让代价在场景中可见：这次胜利会让赵执事把他列为重点打压对象",
+        "用行为或对话体现关系变化：林凡与旁观弟子的关系从可被无视转成必须重新评估",
+        "把价值冲突写进动作或对白：继续忍让保住表面平静 vs 用反抗抢回一点活路",
+        "遵守风格指令：这是全章最强冲突点，动作密度最高，句子更短，爽点要直接，不能用旁白替代爆发。",
+        "给第二场景增加一个更具体的读者预期问题，例如沈砚为什么提前知道代价",
+        "把主角做决定前的内在拉扯再压缩半拍，让伸手动作更像不可撤回的跃迁",
+        "在结尾悬念前加一小处记忆点型意象，强化章节辨识度"
+      ]
+    }
+  },
+  "sceneAlignment": {
+    "mappingBasis": "comparison 基于 draft 文本中的 scene marker 建立映射；re-analysis 的 scene 数量单独记录。",
+    "beforeParsedSceneNumbers": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "afterParsedSceneNumbers": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "beforeAnalysisSceneNumbers": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "afterAnalysisSceneNumbers": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "stableByParsedScenes": true,
+    "stableByAnalysisScenes": true
+  },
+  "sceneChanges": [
+    {
+      "sceneNumber": 3,
+      "sceneId": "scene-3",
+      "sceneAnchor": "scene-3-林凡-当众反击",
+      "beforeProblems": [
+        "该 scene 被选中进行局部重写"
+      ],
+      "appliedRewriteStrategy": [
+        "让 林凡 主动推动场景，并明确执行决策：林凡决定当众反击，哪怕从这一刻起再也回不到低头求活的旧路",
+        "让代价在场景中可见：这次胜利会让赵执事把他列为重点打压对象",
+        "用行为或对话体现关系变化：林凡与旁观弟子的关系从可被无视转成必须重新评估",
+        "把价值冲突写进动作或对白：继续忍让保住表面平静 vs 用反抗抢回一点活路",
+        "遵守风格指令：这是全章最强冲突点，动作密度最高，句子更短，爽点要直接，不能用旁白替代爆发。",
+        "给第二场景增加一个更具体的读者预期问题，例如沈砚为什么提前知道代价",
+        "把主角做决定前的内在拉扯再压缩半拍，让伸手动作更像不可撤回的跃迁",
+        "在结尾悬念前加一小处记忆点型意象，强化章节辨识度"
+      ],
+      "textualChangeEvidence": [
+        {
+          "evidenceLayer": "textual",
+          "changeType": "general_rewrite",
+          "locationHint": "middle",
+          "beforeSnippet": "这一次，冲突不只是事情做不做，而是 继续忍让保住表面平静 和 用反抗抢回一点活路 到底该向哪一边倾斜。 于是这次选择不再只是剧情动作，而是公开的价值站队。",
+          "afterSnippet": "反抗夺路一定伴随后果，而不是无损翻盘 在这一刻变成了必须站队的压力。 于是这次选择不再只是剧情动作，而是公开的价值站队。",
+          "functionOfChange": "标记这次 scene 改写实际发生在哪一段正文中。"
+        },
+        {
+          "evidenceLayer": "localized",
+          "changeType": "pacing_compressed",
+          "locationHint": "middle",
+          "beforeSnippet": "这一次，冲突不只是事情做不做，而是 继续忍让保住表面平静 和 用反抗抢回一点活路 到底该向哪一边倾斜。 于是这次选择不再只是剧情动作，而是公开的价值站队。",
+          "afterSnippet": "反抗夺路一定伴随后果，而不是无损翻盘 在这一刻变成了必须站队的压力。 于是这次选择不再只是剧情动作，而是公开的价值站队。",
+          "functionOfChange": "压缩冗余表达，让冲突推进更直接。"
+        }
+      ],
+      "characterChange": "把 林凡 的决策“林凡决定当众反击，哪怕从这一刻起再也回不到低头求活的旧路”和代价“这次胜利会让赵执事把他列为重点打压对象”写进场景动作。",
+      "themeChange": "把价值冲突“继续忍让保住表面平静 vs 用反抗抢回一点活路”通过 明确站向反抗，但立刻给代价预告 压进场景。",
+      "styleChange": "按风格指令执行局部重写：这是全章最强冲突点，动作密度最高，句子更短，爽点要直接，不能用旁白替代爆发。",
+      "postRewriteAssessment": {
+        "issueResolution": [],
+        "newIssuesIntroduced": [],
+        "rewriteOutcome": "unchanged",
+        "benefitSummary": [
+          "no_meaningful_gain"
+        ]
+      },
+      "beforeExcerpt": "【场景 3 / POV：林凡】 林凡 没有退路。让林凡真正做出反抗规则的决定，并完成第一次局部胜利。真正推动这个场景的，不是信息自己出现，而是 林凡 必须做出决定：林凡决定当众反击，哪怕从这一刻起再也回不到低头求活的旧路。 陈师兄的正面压迫与旁观者对废物身份的认知 立刻构成阻力。林凡必须在众目睽睽之下对陈师兄出手，打破自己是废物的认知框架。林凡 的动作先于解...",
+      "afterExcerpt": "【场景 3 / POV：林凡】 林凡 没有退路。让林凡真正做出反抗规则的决定，并完成第一次局部胜利。真正推动这个场景的，不是信息自己出现，而是 林凡 必须做出决定：林凡决定当众反击，哪怕从这一刻起再也回不到低头求活的旧路。 陈师兄的正面压迫与旁观者对废物身份的认知 立刻构成阻力。林凡必须在众目睽睽之下对陈师兄出手，打破自己是废物的认知框架。林凡 的动作先于解..."
+    }
+  ]
+}

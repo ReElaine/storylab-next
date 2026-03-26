@@ -1,0 +1,515 @@
+[
+  {
+    "name": "林凡",
+    "latestState": {
+      "name": "林凡",
+      "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+      "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+      "misbelief": "只要自己再忍一忍，总能等来一次公平机会",
+      "recentDecision": "林凡做出了带风险的明确选择",
+      "decisionCost": "身体代价已经显性出现",
+      "relationshipShift": [
+        "林凡与赵执事从顺从转对峙向高压协作移动",
+        "林凡与陈师兄从被欺压转反击向高压协作移动"
+      ],
+      "arcProgress": "角色弧线处于起步阶段",
+      "presentInChapter": true
+    },
+    "timeline": [
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱被随意欺压的命运，拿到资源并踏上修炼之路。",
+        "fear": "反抗会招致更严厉的、危及生命的打压，失去仅有的生存空间。",
+        "recentDecision": "当众反抗陈师兄（王虎）的抢夺，并硬扛赵执事的惩罚性安排。",
+        "decisionCost": "失去本月份例，需领禁闭，被指派至危险的后山矿洞，且下月资源减半。虚假的安全感彻底消失。",
+        "arcProgress": "完成了从“忍耐求生”到“反抗夺路”的关键转折，但立刻尝到了反抗的沉重代价，角色弧线进入“付出代价，艰难前行”的新阶段。"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "决定当众反击，夺回被抢的灵石",
+        "decisionCost": "后续资源可能被彻底断供，甚至被安排危险差事，与赵执事公开结怨",
+        "arcProgress": "从忍耐压抑到首次公开反抗，打破了废物认知，但代价明确显现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "夺回被抢的灵石，并证明自己不是任人践踏的废物",
+        "fear": "反抗会招致更严厉的惩罚，彻底断绝在宗门内的生存空间",
+        "recentDecision": "当众反击陈师兄，夺回灵石",
+        "decisionCost": "本月例份被扣，罚往后山矿洞巡查十日，下月例份减半",
+        "arcProgress": "从被动忍耐到主动反抗，并明确意识到反抗必然伴随沉重代价，误判开始动摇"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "当众反抗陈师兄的抢夺，并拒绝向赵执事交还灵石",
+        "decisionCost": "本月例份被扣，罚往后山矿洞巡查十日，下月起例份减半，被赵执事记恨，与陈师兄彻底撕破脸",
+        "arcProgress": "误判（忍耐等机会）被打破，做出反抗决定并承受沉重代价，弧线从被动忍耐转向主动但代价高昂的反抗"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "当众反击陈师兄，夺回灵石",
+        "decisionCost": "本月份例被扣，下月起份例减半，被罚去危险的后山矿洞巡查十日，成为赵执事重点打压对象",
+        "arcProgress": "从忍耐压抑到做出反抗决定并承受初步代价，误判（忍让等机会）开始动摇"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "夺回并守住自己的灵石，不再忍气吞声",
+        "fear": "反抗会招致赵执事更严厉的打压，彻底断送修炼之路",
+        "recentDecision": "当众武力反击陈师兄的抢夺",
+        "decisionCost": "赢得灵石和一时尊严，但彻底得罪赵执事和陈师兄，后续资源与安全面临巨大风险",
+        "arcProgress": "从长期压抑忍耐到首次公开反抗，打破了“废物”的既定形象，但代价也随之明确，反抗之路刚刚开始"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "失控并伤害他人",
+        "recentDecision": "林凡做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "林凡做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "林凡做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "林凡做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "林凡维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "林凡做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色弧线处于起步阶段"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "林凡维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色弧线处于起步阶段"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "林凡维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色弧线处于起步阶段"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "林凡做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "林凡维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "林凡维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "林凡维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "摆脱杂灵根废物的命运，拿到足够资源踏上真正的修炼之路",
+        "fear": "继续忍让下去，会像父亲一样被矿场和宗门规则压榨到死",
+        "recentDecision": "林凡做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色弧线处于起步阶段"
+      }
+    ]
+  },
+  {
+    "name": "赵执事",
+    "latestState": {
+      "name": "赵执事",
+      "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+      "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+      "misbelief": "弱者天生只配服从，谁敢反抗就必须被压断脊梁",
+      "recentDecision": "赵执事做出了带风险的明确选择",
+      "decisionCost": "身体代价已经显性出现",
+      "relationshipShift": [
+        "赵执事与林凡从轻视转记恨向高压协作移动",
+        "赵执事与陈师兄从偏帮与利用向高压协作移动"
+      ],
+      "arcProgress": "角色弧线处于起步阶段",
+      "presentInChapter": true
+    },
+    "timeline": [
+      {
+        "chapterNumber": 1,
+        "desire": "维护现有秩序，惩罚林凡的反抗以儆效尤，巩固自身权威。",
+        "fear": "底层弟子的反抗行为会动摇其掌控力。",
+        "recentDecision": "利用规则，对林凡施加扣发资源、禁闭、危险任务、削减未来配额等一系列组合惩罚。",
+        "decisionCost": "暂时未明，但其打压行为可能埋下更深的隐患。",
+        "arcProgress": "作为压迫源，其角色功能被强化，从规则的执行者变为规则的扭曲者以实施报复。"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "默许并偏帮陈师兄抢夺林凡的灵石，并在林凡反抗后决定后续打压",
+        "decisionCost": "与林凡公开结怨，可能埋下未来冲突的隐患",
+        "arcProgress": "从利用规则压迫到因林凡反抗而直接记恨，压迫手段升级"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维护宗门规则和自己的权威，惩罚林凡以儆效尤",
+        "fear": "底层弟子反抗成功会动摇既得秩序",
+        "recentDecision": "以“规矩”为名，对林凡施加扣除例份、罚往矿洞的惩罚",
+        "decisionCost": "暂时未明确",
+        "arcProgress": "作为压迫源的角色得到巩固，其利用规则打压反抗者的行为模式完全显现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "利用门规严惩林凡，以儆效尤",
+        "decisionCost": "暂时维护了规则权威，但可能埋下更深的对抗种子",
+        "arcProgress": "成功施加惩罚，巩固了其作为规则执行者和压迫者的地位"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "利用门规对林凡进行惩罚，将反抗的胜利转化为更沉重的代价",
+        "decisionCost": "未明确",
+        "arcProgress": "压迫者的地位稳固，通过规则惩罚强化了权威，误判（弱者只配服从）被林凡的反抗行为挑战但未被打破"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持秩序，打压林凡的反抗势头，维护自身权威",
+        "fear": "底层弟子反抗成功会动摇其掌控力",
+        "recentDecision": "以“偷袭”“规矩”为由介入冲突，表面平息事态，实则记恨并准备后续打压林凡",
+        "decisionCost": "暂时维持了场面秩序，但暴露了偏袒，并激化了与林凡的矛盾",
+        "arcProgress": "从规则的执行者变为偏袒的压迫者，对林凡的态度从轻视转为明确的敌意和打压意图"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "失控并伤害他人",
+        "recentDecision": "赵执事做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "赵执事做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "赵执事做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "赵执事做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "赵执事维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "赵执事做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色弧线处于起步阶段"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "赵执事维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色弧线处于起步阶段"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "赵执事维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色弧线处于起步阶段"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "赵执事做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "赵执事维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "赵执事维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "赵执事维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "维持资源向强者和自己派系倾斜的既得秩序",
+        "fear": "底层弟子开始不按规矩屈服，削弱自己在外门的掌控",
+        "recentDecision": "赵执事做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色弧线处于起步阶段"
+      }
+    ]
+  },
+  {
+    "name": "陈师兄",
+    "latestState": {
+      "name": "陈师兄",
+      "desire": "靠踩底层弟子维持地位和优越感",
+      "fear": "被比自己更弱的人当众顶回来，坏了名声",
+      "misbelief": "只要有背景和靠山，就能把冲突变成自己的优势",
+      "recentDecision": "陈师兄做出了带风险的明确选择",
+      "decisionCost": "身体代价已经显性出现",
+      "relationshipShift": [
+        "陈师兄与林凡从羞辱转撕破脸向高压协作移动",
+        "陈师兄与赵执事从依附与借势向高压协作移动"
+      ],
+      "arcProgress": "角色弧线处于起步阶段",
+      "presentInChapter": true
+    },
+    "timeline": [
+      {
+        "chapterNumber": 1,
+        "desire": "羞辱并夺取林凡的资源，维持自己的优越感。",
+        "fear": "当众被弱者反击，颜面尽失，地位受损。",
+        "recentDecision": "试图强行拿走林凡的灵石，并在冲突中动用灵力。",
+        "decisionCost": "当众被林凡击退，狼狈失态，虽然看到林凡受罚而幸灾乐祸，但个人威信已受损。",
+        "arcProgress": "作为直接冲突的挑衅者与失败者，其角色推动了主角的转变，自身则沦为衬托主角反抗代价的工具。"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "当众抢走林凡的灵石",
+        "decisionCost": "被林凡当众反击压制，丢了面子",
+        "arcProgress": "从主动施压到被反击压制，优越感受到打击"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "当众羞辱并抢夺林凡的灵石，维持自己的优越感",
+        "fear": "被弱者当众击败，坏了名声",
+        "recentDecision": "当众抢夺林凡灵石",
+        "decisionCost": "被林凡当众击败，半跪于地，颜面尽失",
+        "arcProgress": "作为直接冲突对象的角色完成，其欺软怕硬的特质暴露"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "当众抢夺林凡灵石，并在被反击后试图继续施暴",
+        "decisionCost": "当众被反击失手，丢了面子，虽未受罚但结下仇怨",
+        "arcProgress": "欺压行为首次遭遇坚决反击，优越感受到打击"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "当众抢夺林凡的灵石",
+        "decisionCost": "被林凡当众压制，丢了面子，在赵执事面前失势",
+        "arcProgress": "施压者遭遇公开失败，优越感受到打击，误判（靠山能解决一切）在赵执事的“两清”表态中受到动摇"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "当众羞辱并抢夺林凡的灵石，维持优越感",
+        "fear": "被弱者当众反击，丢了面子和地位",
+        "recentDecision": "伸手抢夺林凡灵石，并在被反击后试图再次动手",
+        "decisionCost": "抢夺失败，当众被击退，颜面扫地，在赵执事介入下未能当场报复",
+        "arcProgress": "从施暴者变为受挫者，对林凡的欺压遭遇了首次实质性失败，关系彻底敌对"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "失控并伤害他人",
+        "recentDecision": "陈师兄做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "陈师兄做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "陈师兄做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "陈师兄做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "陈师兄维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "陈师兄做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色弧线处于起步阶段"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "陈师兄维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色弧线处于起步阶段"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "陈师兄维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色弧线处于起步阶段"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "陈师兄做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "陈师兄维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "陈师兄维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "陈师兄维持推进并暴露其当前策略",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色继续按照旧误判行动，但裂缝已经出现"
+      },
+      {
+        "chapterNumber": 1,
+        "desire": "靠踩底层弟子维持地位和优越感",
+        "fear": "被比自己更弱的人当众顶回来，坏了名声",
+        "recentDecision": "陈师兄做出了带风险的明确选择",
+        "decisionCost": "身体代价已经显性出现",
+        "arcProgress": "角色弧线处于起步阶段"
+      }
+    ]
+  }
+]

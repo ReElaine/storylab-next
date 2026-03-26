@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   BookRecord,
@@ -62,23 +62,44 @@ export class ProjectStore {
     return readFile(join(chaptersDir, match), "utf-8");
   }
 
-  async loadDraftContent(bookId: string, chapterNumber: number): Promise<string> {
-    const draftsDir = join(this.bookDir(bookId), "drafts");
+  async loadWriterWorkingContent(bookId: string, chapterNumber: number): Promise<string> {
     const prefix = String(chapterNumber).padStart(4, "0");
+    const internalDirs = [
+      join(this.storyDir(bookId), "writers-internal"),
+      join(this.storyDir(bookId), "drafts-internal"),
+    ];
+    for (const internalDir of internalDirs) {
+      try {
+        const files = await readdir(internalDir);
+        const match = files
+          .filter((file: string) => file.startsWith(prefix) && file.endsWith(".raw.md"))
+          .sort((left, right) => right.localeCompare(left, "zh-Hans-CN"))
+          .at(0);
+        if (match) {
+          const raw = await readFile(join(internalDir, match), "utf-8");
+          return this.extractDraftBody(raw);
+        }
+      } catch {
+        // Continue to the next fallback directory.
+      }
+    }
+
+    const draftsDir = join(this.bookDir(bookId), "drafts");
     const files = await readdir(draftsDir);
-    const match = files.find((file: string) => file.startsWith(prefix) && file.endsWith(".md"));
+    const match = files
+      .filter((file: string) => file.startsWith(prefix) && (file.endsWith(".md") || file.endsWith(".txt")))
+      .sort((left, right) => right.localeCompare(left, "zh-Hans-CN"))
+      .at(0);
     if (!match) {
       throw new Error(`Draft ${chapterNumber} not found for book ${bookId}`);
     }
 
     const raw = await readFile(join(draftsDir, match), "utf-8");
-    const lines = raw.split(/\r?\n/);
-    const separatorIndex = lines.findIndex((line) => line.trim() === "---");
-    const bodyLines = lines
-      .slice(0, separatorIndex >= 0 ? separatorIndex : lines.length)
-      .filter((line, index) => !(index === 0 && line.startsWith("# ")));
+    return this.extractDraftBody(raw);
+  }
 
-    return bodyLines.join("\n").trim();
+  async loadDraftContent(bookId: string, chapterNumber: number): Promise<string> {
+    return this.loadWriterWorkingContent(bookId, chapterNumber);
   }
 
   async ensureStoryDirs(bookId: string): Promise<void> {
@@ -88,6 +109,7 @@ export class ProjectStore {
       mkdir(join(storyDir, "characters"), { recursive: true }),
       mkdir(join(storyDir, "themes"), { recursive: true }),
       mkdir(join(storyDir, "reviews"), { recursive: true }),
+      mkdir(join(storyDir, "reviews", "writers"), { recursive: true }),
       mkdir(join(storyDir, "reviews", "drafts"), { recursive: true }),
       mkdir(join(storyDir, "reviews", "revisions"), { recursive: true }),
       mkdir(join(storyDir, "revisions"), { recursive: true }),
@@ -95,7 +117,12 @@ export class ProjectStore {
       mkdir(join(storyDir, "human-gates"), { recursive: true }),
       mkdir(join(storyDir, "planning"), { recursive: true }),
       mkdir(join(storyDir, "memory"), { recursive: true }),
+      mkdir(join(storyDir, "writers-internal"), { recursive: true }),
+      mkdir(join(storyDir, "drafts-internal"), { recursive: true }),
+      mkdir(join(storyDir, "revisions", "internal"), { recursive: true }),
+      mkdir(join(this.bookDir(bookId), "writers"), { recursive: true }),
       mkdir(join(this.bookDir(bookId), "drafts"), { recursive: true }),
+      mkdir(join(this.bookDir(bookId), "final"), { recursive: true }),
     ]);
   }
 
@@ -138,25 +165,53 @@ export class ProjectStore {
     );
   }
 
+  async writeWriterWorking(bookId: string, draft: ChapterDraft): Promise<string> {
+    const internalDir = join(this.storyDir(bookId), "writers-internal");
+    await mkdir(internalDir, { recursive: true });
+    return this.writeDraftFile(internalDir, draft, ".raw", { cleanForReaders: false, extension: ".md" });
+  }
+
   async writeDraft(bookId: string, draft: ChapterDraft): Promise<string> {
-    const draftsDir = join(this.bookDir(bookId), "drafts");
-    await mkdir(draftsDir, { recursive: true });
-    return this.writeDraftFile(draftsDir, draft, "");
+    return this.writeWriterWorking(bookId, draft);
+  }
+
+  async writeRevisedWriterWorking(bookId: string, draft: ChapterDraft): Promise<string> {
+    const internalDir = join(this.storyDir(bookId), "revisions", "internal");
+    await mkdir(internalDir, { recursive: true });
+    return this.writeDraftFile(internalDir, draft, ".revised.raw", { cleanForReaders: false, extension: ".md" });
   }
 
   async writeRevisedDraft(bookId: string, draft: ChapterDraft): Promise<string> {
-    const revisionsDir = join(this.bookDir(bookId), "drafts", "revised");
-    await mkdir(revisionsDir, { recursive: true });
-    return this.writeDraftFile(revisionsDir, draft, ".revised");
+    return this.writeRevisedWriterWorking(bookId, draft);
   }
 
-  private async writeDraftFile(baseDir: string, draft: ChapterDraft, suffix: string): Promise<string> {
-    const fileName = `${String(draft.chapterNumber).padStart(4, "0")}_${this.sanitizeFileName(draft.title)}${suffix}.md`;
+  async writeFinalProse(bookId: string, draft: ChapterDraft): Promise<string> {
+    const finalDir = join(this.bookDir(bookId), "final");
+    await mkdir(finalDir, { recursive: true });
+    return this.writeDraftFile(finalDir, draft, "", { cleanForReaders: true, extension: ".txt" });
+  }
+
+  private async writeDraftFile(
+    baseDir: string,
+    draft: ChapterDraft,
+    suffix: string,
+    options: { cleanForReaders: boolean; extension: ".md" | ".txt" },
+  ): Promise<string> {
+    const prefix = String(draft.chapterNumber).padStart(4, "0");
+    const existing = (await readdir(baseDir))
+      .filter((file: string) => (
+        file.startsWith(prefix) &&
+        (file.endsWith(`${suffix}.md`) || file.endsWith(`${suffix}.txt`))
+      ));
+    await Promise.all(existing.map((file) => unlink(join(baseDir, file))));
+
+    const fileName = `${prefix}_${this.sanitizeFileName(draft.title)}${suffix}${options.extension}`;
     const path = join(baseDir, fileName);
+    const body = options.cleanForReaders ? this.stripSceneMarkers(draft.content) : draft.content;
     const markdown = [
       `# 第${draft.chapterNumber}章 ${draft.title}`,
       "",
-      draft.content,
+      body,
       "",
       "---",
       `基于规划章节: ${draft.basedOnPlan}`,
@@ -182,5 +237,22 @@ export class ProjectStore {
 
   private sanitizeFileName(input: string): string {
     return input.replace(/[/\\?%*:|"<>]/g, "").replace(/\s+/g, "_").slice(0, 50);
+  }
+
+  private extractDraftBody(raw: string): string {
+    const lines = raw.split(/\r?\n/);
+    const separatorIndex = lines.findIndex((line) => line.trim() === "---");
+    const bodyLines = lines
+      .slice(0, separatorIndex >= 0 ? separatorIndex : lines.length)
+      .filter((line, index) => !(index === 0 && line.startsWith("# ")));
+
+    return bodyLines.join("\n").trim();
+  }
+
+  private stripSceneMarkers(content: string): string {
+    return content
+      .replace(/^\s*【场景\s*\d+\s*\/\s*POV：[^】]+】\s*$/gmu, "")
+      .replace(/\n{3,}/gu, "\n\n")
+      .trim();
   }
 }

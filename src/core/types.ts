@@ -208,6 +208,8 @@ export interface ChapterDraft {
   readonly basedOnPlan: number;
 }
 
+export type ChapterWriterOutput = ChapterDraft;
+
 export interface ChapterAnalysisBundle {
   readonly scenes: ReadonlyArray<ScenePlanItem>;
   readonly characterStates: ReadonlyArray<CharacterState>;
@@ -223,6 +225,8 @@ export interface StorylabRunResult {
   readonly chapterNumber: number;
   readonly outputs: ReadonlyArray<string>;
   readonly provider: string;
+  readonly analysisProvider?: string;
+  readonly readerProvider?: string;
 }
 
 export interface StorylabPlanResult {
@@ -232,14 +236,15 @@ export interface StorylabPlanResult {
   readonly provider: string;
 }
 
-export interface StorylabDraftResult {
+export interface StorylabWriterResult {
   readonly bookId: string;
   readonly chapterNumber: number;
-  readonly outputPath: string;
+  readonly writerWorkingPath: string;
   readonly provider: string;
+  readonly writerProvider?: string;
 }
 
-export interface DraftReviewArtifacts {
+export interface WriterReviewArtifacts {
   readonly reviewPath: string;
   readonly revisionBriefPath: string;
 }
@@ -391,27 +396,70 @@ export interface RevisionResult {
   readonly trace: RevisionTrace;
 }
 
-export interface StorylabDraftCycleResult {
+export interface StorylabWriterCycleResult {
   readonly bookId: string;
   readonly chapterNumber: number;
-  readonly draftPath: string;
+  readonly writerWorkingPath: string;
   readonly provider: string;
+  readonly writerProvider: string;
+  readonly analysisProvider: string;
+  readonly readerProvider?: string;
   readonly reviewPath: string;
   readonly revisionBriefPath: string;
   readonly blockingGate: BlockingGateStatus;
+  readonly finalProsePath: string | null;
 }
+
+export type StorylabDraftResult = StorylabWriterResult;
+export type DraftReviewArtifacts = WriterReviewArtifacts;
+export type StorylabDraftCycleResult = StorylabWriterCycleResult;
 
 export interface StorylabRevisionCycleResult {
   readonly bookId: string;
   readonly chapterNumber: number;
-  readonly initialDraftPath: string;
-  readonly revisedDraftPath: string;
+  readonly initialWriterWorkingPath: string;
+  readonly revisedWriterWorkingPath: string;
   readonly reviewPath: string;
   readonly revisedReviewPath: string;
   readonly comparisonPath: string;
   readonly provider: string;
+  readonly writerProvider: string;
+  readonly analysisProvider: string;
+  readonly readerProvider?: string;
+  readonly reviseProvider: string;
   readonly blockingGate: BlockingGateStatus;
+  readonly postRevisionGate: BlockingGateStatus;
+  readonly finalProsePath: string | null;
   readonly targetSceneNumbers: ReadonlyArray<number>;
   readonly actualRewrittenSceneNumbers: ReadonlyArray<number>;
   readonly comparisonSceneNumbers: ReadonlyArray<number>;
+}
+
+export interface StorylabRevisionLoopIteration {
+  readonly iteration: number;
+  readonly beforeScores: ReaderExperienceReport["scores"];
+  readonly afterScores: ReaderExperienceReport["scores"];
+  readonly blockingGate: BlockingGateStatus;
+  readonly postRevisionGate: BlockingGateStatus;
+  readonly targetSceneNumbers: ReadonlyArray<number>;
+  readonly actualRewrittenSceneNumbers: ReadonlyArray<number>;
+  readonly comparisonSceneNumbers: ReadonlyArray<number>;
+  readonly readerSummary: string;
+  readonly readerSuggestions: ReadonlyArray<string>;
+}
+
+export interface StorylabRevisionLoopResult {
+  readonly bookId: string;
+  readonly chapterNumber: number;
+  readonly initialWriterWorkingPath: string;
+  readonly latestWriterWorkingPath: string;
+  readonly finalProsePath: string | null;
+  readonly passed: boolean;
+  readonly iterations: ReadonlyArray<StorylabRevisionLoopIteration>;
+  readonly stopReason: string;
+  readonly maxIterations: number;
+  readonly writerProvider: string;
+  readonly analysisProvider: string;
+  readonly readerProvider?: string;
+  readonly reviseProvider: string;
 }
