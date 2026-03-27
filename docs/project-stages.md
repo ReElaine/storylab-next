@@ -15,11 +15,11 @@
 | 阶段一 | 单章增强分析 | 已完成基础版 | 建立 scene / character / theme / style / reader-experience / gate 的单章分析能力 |
 | 阶段二 | 跨章累计状态 | 已完成基础版 | 建立 character history / theme history / story memory，并支持下一章规划 |
 | 阶段三 | 章节主链打通 | 已完成基础版 | 打通 `plan -> writer -> review -> revise` 的最小闭环 |
-| 阶段四 | 可插拔智能引擎 | 已完成基础版 | 让 analysis / planner / writer / revise 具备 `heuristic / openai` 可切换能力 |
+| 阶段四 | 可插拔智能引擎 | 已完成基础版 | 让 analysis / planner / writer / reader / revise 具备 `heuristic / openai` 可切换能力 |
 | 阶段五 | scene-level revise 与可追踪性 | 已完成 | 证明系统可以只改指定 scene，并追踪 target / actual / comparison 三套集合 |
 | 阶段六 | rewrite effectiveness | 进行中 | 证明“改了哪里”之外，还能说明“为什么值得改、改完是否更好” |
-| 阶段七 | 人类协作工作流 | 未开始 | 引入 advisory / blocking gate 的更完整流程控制 |
-| 阶段八 | 质量增强与策略深化 | 未开始 | 强化真实收益判断、回归检测、更成熟的 rewrite 策略与质量控制 |
+| 阶段七 | 自动循环与 gate 策略 | 已完成基础版 | 建立串行 `revise-until-pass`、reader 优先 gate、override 与最终正文导出策略 |
+| 阶段八 | 质量增强与策略深化 | 进行中 | 强化真实收益判断、回归检测、更成熟的 rewrite 策略与质量控制 |
 
 ## 2. 各阶段说明
 
@@ -172,32 +172,34 @@
 - comparison 不只说明“做了什么”
 - 还能判断“做得值不值”
 
-### 阶段七：人类协作工作流
+### 阶段七：自动循环与 gate 策略
 
-当前结论：未开始。
+当前结论：已完成基础版。
 
-计划目标：
+已经具备：
 
-- advisory gate
-- blocking gate
-- gate override
-- 关键节点人工确认
+- `revise-until-pass`
+- 串行自动循环
+- reader 优先 gate
+- advisory / blocking 区分
+- `--override`
+- 只有通过 gate 后才导出最终正文 `.txt`
 
-预期阶段门：
+仍待继续强化：
 
-- 开书前
-- 前几章后
-- 中盘转折前
-- 结尾收束前
+- 更成熟的人类确认节点
+- 更丰富的 gate 类型与协作策略
+- 更细粒度的“为什么通过 / 为什么阻断”解释
 
 阶段验收标准：
 
-- gate 不再只是提示
-- 系统具备明确的人工介入点与阻断机制
+- 系统不再盲目一直 revise
+- 当前版本已经过线时可以直接通过
+- quality advisory 不会继续把已达标正文修坏
 
 ### 阶段八：质量增强与策略深化
 
-当前结论：未开始。
+当前结论：进行中。
 
 计划方向：
 
@@ -216,13 +218,14 @@
 
 当前主阶段是：
 
-`阶段六：rewrite effectiveness`
+`阶段八：质量增强与策略深化`
 
 当前最重要的目标是：
 
-1. 让 `textualChangeEvidence` 更接近真实文本改写证据
-2. 让 `postRewriteAssessment` 更像效果判断，而不是说明文
-3. 用更接近真实章节的样例验证 rewrite 是否真的稳定有效
+1. 提升 writer 初稿质量，而不是依赖 revise 救火
+2. 继续压低全 LLM 串行链路耗时
+3. 让 rewrite effectiveness 与人类编辑判断更一致
+4. 在 reader 优先策略下继续优化 scene audit 的 advisory 质量
 
 当前不应该优先做的事情：
 
@@ -230,20 +233,65 @@
 - 过早做 UI / 可视化
 - 过早把重点放到更复杂的模型路由
 
+## 3.1 下一条架构升级主线
+
+除了当前的单章质量强化，项目已经记录了下一条明确升级路线：
+
+- [跨章连续写作路线](/C:/Working/storylab-next/docs/cross-chapter-continuity.md)
+
+这条路线专门解决：
+
+- 世界规则连续
+- 人物状态与人设连续
+- 欲望 / 恐惧 / 误判 / 关系 / 弧线连续演化
+- 伏笔 / 承诺 / 未兑现事件可追踪
+- 时间线与因果链连续
+- revise 后状态重结算
+
+它当前被拆成 4 个 phase：
+
+1. Settlement Layer
+2. State-Driven Planning
+3. Continuity Audit
+4. Re-settlement
+
+更新：
+
+- `Phase 1: Settlement Layer` 已完成初版实现
+- 当前已经能在 final prose 后生成：
+  - `chapter-summary`
+  - `chapter-state-delta`
+  - `chronology`
+  - `open-loops`
+- `plan-next` 也已经开始读取这些账本
+
+但当前还未进入：
+
+- continuity gate
+- re-settlement
+- relationship / reveals / theme progression 的完整账本
+
+这条路线当前已经不只是“立项记录”，而是：
+
+- 已经完成 Phase 1 初版
+- 正在准备进入 Phase 2（State-Driven Planning）
+- 后续会继续进入 Phase 3 / Phase 4
+
 ## 4. 当前优先级
 
 ### P0
 
-- 细化文本级改写证据
-- 细化问题解决状态判断
-- 扩展真实章节样例验证
-- 强化 rewrite benefit 判断
+- 提升 writer 初稿质感
+- 降低全 LLM 串行链路耗时
+- 强化 rewrite effectiveness 与人类判断的一致性
+- 继续收敛 reader 优先 gate 下的 advisory 解释
 
 ### P1
 
 - regression 标记
 - no-op rewrite 判定
 - 多问题单目标样例
+- 更完整的人类协作 gate
 
 ### P2
 
@@ -263,5 +311,5 @@
 
 ## 6. 一句话状态判断
 
-`storylab-next` 已经跨过“独立架构搭建”和“scene-level 可追踪改写”两个关键门槛，当前正处于“证明改写有效、证明改完更好”的阶段。
+`storylab-next` 已经跨过“独立架构搭建”“scene-level 可追踪改写”和“reader 优先自动循环”三个关键门槛，当前正处于“提升全 LLM 实战质量与效率”的阶段。
 

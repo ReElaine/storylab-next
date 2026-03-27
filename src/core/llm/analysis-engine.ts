@@ -13,7 +13,7 @@ import { ScenePlanner } from "../modules/scene-planner.js";
 import { StyleEngine } from "../modules/style-engine.js";
 import { ThemeTracker } from "../modules/theme-tracker.js";
 import { buildRevisionBrief } from "../modules/revision-brief.js";
-import { createOpenAIClient, parseJsonObjectWithRepair, resolveOpenAIConfig } from "./openai-shared.js";
+import { createChatCompletionWithRetry, createOpenAIClient, parseJsonObjectWithRepair, resolveOpenAIConfig } from "./openai-shared.js";
 
 export interface AnalysisInput {
   readonly chapterNumber: number;
@@ -205,30 +205,6 @@ function normalizeStyleReport(
   };
 }
 
-function normalizeReaderReport(
-  value: unknown,
-  fallback: ChapterAnalysisBundle["readerReport"],
-): ChapterAnalysisBundle["readerReport"] {
-  if (!isObject(value) || !isObject(value.scores)) {
-    return fallback;
-  }
-
-  return {
-    chapterNumber: asNumber(value.chapterNumber, fallback.chapterNumber),
-    scores: {
-      hook: asNumber(value.scores.hook, fallback.scores.hook),
-      momentum: asNumber(value.scores.momentum, fallback.scores.momentum),
-      emotionalPeak: asNumber(value.scores.emotionalPeak, fallback.scores.emotionalPeak),
-      suspense: asNumber(value.scores.suspense, fallback.scores.suspense),
-      memorability: asNumber(value.scores.memorability, fallback.scores.memorability),
-    },
-    summary: asString(value.summary, fallback.summary),
-    strengths: asStringArray(value.strengths, fallback.strengths),
-    risks: asStringArray(value.risks, fallback.risks),
-    revisionSuggestions: asStringArray(value.revisionSuggestions, fallback.revisionSuggestions),
-  };
-}
-
 function buildAnalysisSchemaPrompt(): string {
   return [
     "你是 Storylab 的章节分析引擎。",
@@ -288,24 +264,10 @@ function buildAnalysisSchemaPrompt(): string {
     '    "dialogueHomogeneitySpots": ["对白同质化位置"],',
     '    "descriptionBalanceNote": "描写密度说明"',
     "  },",
-    '  "readerReport": {',
-    '    "chapterNumber": 1,',
-    '    "scores": {',
-    '      "hook": 7,',
-    '      "momentum": 8,',
-    '      "emotionalPeak": 7,',
-    '      "suspense": 6,',
-    '      "memorability": 7',
-    "    },",
-    '    "summary": "一句话总结",',
-    '    "strengths": ["优点"],',
-    '    "risks": ["风险"],',
-    '    "revisionSuggestions": ["修订建议"]',
-    "  }",
     "}",
     "",
     "规则：",
-    "1. scenes、characterStates、themeReport.activeThemes、readerReport.strengths、readerReport.risks、readerReport.revisionSuggestions 必须是数组。",
+    "1. scenes、characterStates、themeReport.activeThemes 必须按给定结构返回，不允许改字段名。",
     "2. sourceParagraphs 必须摘取原文中的真实段落，不允许编造章节外信息。",
     "3. sceneNumber 必须从 1 开始递增。",
     "4. 如果只能识别一个主题，也必须返回 activeThemes 数组，至少包含 1 项。",
@@ -327,7 +289,7 @@ export class OpenAIAnalysisEngine implements AnalysisEngine {
 
   async analyze(input: AnalysisInput): Promise<ChapterAnalysisBundle> {
     const heuristic = await this.heuristic.analyze(input);
-    const response = await this.client.chat.completions.create({
+    const response = await createChatCompletionWithRetry(this.client, {
       model: this.model,
       temperature: 0.3,
       response_format: { type: "json_object" },
@@ -355,6 +317,9 @@ export class OpenAIAnalysisEngine implements AnalysisEngine {
           ].join("\n"),
         },
       ],
+    }, {
+      label: "analysis",
+      maxAttempts: 3,
     });
 
     const raw = response.choices[0]?.message?.content ?? "";
@@ -375,7 +340,7 @@ export class OpenAIAnalysisEngine implements AnalysisEngine {
     const characterStates = normalizeCharacterStates(parsed.characterStates, heuristic.characterStates);
     const themeReport = normalizeThemeReport(parsed.themeReport ?? parsed.themes, heuristic.themeReport);
     const styleReport = normalizeStyleReport(parsed.styleReport, heuristic.styleReport);
-    const readerReport = normalizeReaderReport(parsed.readerReport, heuristic.readerReport);
+    const readerReport = heuristic.readerReport;
     const gateDecision = this.gatekeeper.decide(input.chapterNumber, input.gates);
     const revisionBrief = buildRevisionBrief({
       chapterNumber: input.chapterNumber,

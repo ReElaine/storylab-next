@@ -36,7 +36,7 @@
 | `write-from-plan` | 支持 | `heuristic` | 可切换 | writer generation 可切 `heuristic / openai` |
 | `writer-cycle` | 支持 | `heuristic` | 混合链路 | writer 可用 LLM，但 review 仍依赖 analysis engine + reader engine + scene auditor + blocking gate |
 | `revise-cycle` | 支持 | `heuristic` | 混合链路 | revise 可用 LLM，但 before/after analysis、scene audit、comparison、persist 不等于全都由 LLM 负责 |
-| `revise-until-pass` | 支持 | `heuristic` | 自动循环 | writer / analysis / reader / revise 可混搭，循环直到 gate 通过或停止条件触发 |
+| `revise-until-pass` | 支持 | `heuristic` | 自动循环 | writer / analysis / reader / revise 可混搭，当前按串行执行，循环直到 gate 通过或停止条件触发 |
 
 ## 3. 引擎级对照表
 
@@ -55,11 +55,12 @@
 | 能力 | 当前主导方式 | 说明 |
 | --- | --- | --- |
 | `SceneAuditor` | heuristic / deterministic | 作为 writer / revise 后的硬基准存在 |
-| blocking gate | heuristic / deterministic | 根据 reader score 与 high severity scene issues 触发 |
+| blocking gate | heuristic / deterministic | 采用 reader 优先策略：reader 过线后，质量型 high severity 会降为 advisory，只有硬结构问题继续阻断 |
 | scene traceability | deterministic | target / actual / comparison / unchanged 等集合由代码跟踪，不依赖 LLM 自报 |
 | scene text replace | deterministic | `prelude / scene blocks / postlude` 的保留与替换由代码控制 |
 | comparison assembly | deterministic + analysis input | comparison 的结构由代码生成，部分依据 analysis/re-analysis 结果 |
 | history / memory persist | deterministic | 状态写回完全由本地 store 与 builder 负责 |
+| timeout / retry / JSON repair | deterministic | 统一包在 OpenAI 兼容调用之外，保证 LLM 链路更稳定 |
 
 ## 5. 各流程的“真实状态”说明
 
@@ -135,6 +136,19 @@
 所以它更准确地说是：
 
 `LLM-capable scene rewrite inside a deterministic revise loop`
+
+### `revise-until-pass`
+
+当前链路是：
+
+`writer -> analysis -> reader -> scene audit -> gate -> revise? -> re-analysis -> re-reader -> post-gate`
+
+它的关键点是：
+
+- 串行执行，不并行调多个 LLM agent
+- CLI 会输出阶段进度、reader 分数、建议与 retry 日志
+- 如果当前版本已通过 reader 优先 gate，会直接跳过 revise
+- 只有在仍然 blocking 时，才会进入下一轮局部改写
 
 ## 6. 当前最准确的项目表述
 

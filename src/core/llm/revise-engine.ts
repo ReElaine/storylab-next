@@ -18,7 +18,7 @@ import type {
   ThemeHistory,
 } from "../types.js";
 import { parseSceneDocument, replaceSceneUnits, shortenSceneExcerpt, type SceneTextUnit } from "../utils/scene-text.js";
-import { createOpenAIClient, resolveOpenAIConfig } from "./openai-shared.js";
+import { createChatCompletionWithRetry, createOpenAIClient, resolveOpenAIConfig } from "./openai-shared.js";
 
 export interface RevisionInput {
   readonly draft: ChapterDraft;
@@ -51,6 +51,23 @@ function describeSceneIssueType(issue: SceneAuditIssue): string {
   if (issue.problem.includes("POV")) return "POV 漂移";
   if (issue.problem.includes("冲突")) return "冲突不足";
   return issue.problem;
+}
+
+function readerScoresPass(report: ChapterAnalysisBundle["readerReport"]): boolean {
+  return (
+    report.scores.hook >= 6 &&
+    report.scores.momentum >= 6 &&
+    report.scores.emotionalPeak >= 6 &&
+    report.scores.suspense >= 6 &&
+    report.scores.memorability >= 6
+  );
+}
+
+function isHardBlockingSceneIssue(issue: SceneAuditIssue): boolean {
+  return (
+    issue.problem.includes("草稿没有覆盖全部计划场景") ||
+    issue.problem.includes("POV")
+  );
 }
 
 function collectTargetSceneNumbers(input: RevisionInput): ReadonlyArray<number> {
@@ -564,7 +581,7 @@ export class OpenAIReviseEngine implements ReviseEngine {
       const reason = buildSceneRewriteReason(issues);
         const strategy = buildSceneRewriteStrategy(scene, issues, input.analysis.readerReport.revisionSuggestions);
 
-      const response = await this.client.chat.completions.create({
+      const response = await createChatCompletionWithRetry(this.client, {
         model: this.model,
         temperature: 0.3,
         messages: [
@@ -586,6 +603,9 @@ export class OpenAIReviseEngine implements ReviseEngine {
             }),
           },
         ],
+      }, {
+        label: `revise-scene-${scene.sceneNumber}`,
+        maxAttempts: 3,
       });
 
         const rewrittenContent = response.choices[0]?.message?.content?.trim();
@@ -646,7 +666,10 @@ export function buildBlockingGateStatus(params: {
   readonly sceneAudit: SceneAuditReport;
 }): BlockingGateStatus {
   const reasons: string[] = [];
+  const advisoryReasons: string[] = [];
   const blockingSceneMap = new Map<number, Set<string>>();
+  const advisorySceneMap = new Map<number, Set<string>>();
+  const readerPassed = readerScoresPass(params.analysis.readerReport);
 
   if (params.analysis.readerReport.scores.hook < 6) reasons.push("hook 分过低");
   if (params.analysis.readerReport.scores.momentum < 6) reasons.push("momentum 分过低");
@@ -656,10 +679,12 @@ export function buildBlockingGateStatus(params: {
 
   for (const issue of params.sceneAudit.issues) {
     if (issue.severity !== "high") continue;
-    if (!blockingSceneMap.has(issue.sceneNumber)) {
-      blockingSceneMap.set(issue.sceneNumber, new Set<string>());
+    const issueType = describeSceneIssueType(issue);
+    const targetMap = (!readerPassed || isHardBlockingSceneIssue(issue)) ? blockingSceneMap : advisorySceneMap;
+    if (!targetMap.has(issue.sceneNumber)) {
+      targetMap.set(issue.sceneNumber, new Set<string>());
     }
-    blockingSceneMap.get(issue.sceneNumber)?.add(describeSceneIssueType(issue));
+    targetMap.get(issue.sceneNumber)?.add(issueType);
   }
 
   if (blockingSceneMap.size > 0) {
@@ -669,10 +694,23 @@ export function buildBlockingGateStatus(params: {
     reasons.push(`scene audit 存在 high severity 问题 (${sceneMessages.join("; ")})`);
   }
 
+  if (advisorySceneMap.size > 0) {
+    const sceneMessages = Array.from(advisorySceneMap.entries()).map(
+      ([sceneNumber, issueTypes]) => `scene ${sceneNumber}: ${Array.from(issueTypes).join(", ")}`,
+    );
+    advisoryReasons.push(`scene audit 存在质量型 high severity 问题，但 reader 已过线 (${sceneMessages.join("; ")})`);
+  }
+
   return {
     blocking: reasons.length > 0,
     reasons,
+    advisoryReasons,
+    readerPassed,
     blockingScenes: Array.from(blockingSceneMap.entries()).map(([sceneNumber, issueTypes]) => ({
+      sceneNumber,
+      issueTypes: Array.from(issueTypes),
+    })),
+    advisoryScenes: Array.from(advisorySceneMap.entries()).map(([sceneNumber, issueTypes]) => ({
       sceneNumber,
       issueTypes: Array.from(issueTypes),
     })),

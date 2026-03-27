@@ -1,6 +1,7 @@
 import { buildRevisionBrief } from "../modules/revision-brief.js";
 import { HistoryBuilder } from "../modules/history-builder.js";
 import { HumanReviewGatekeeper } from "../modules/human-review-gates.js";
+import { SettlementAgent } from "../modules/settlement-agent.js";
 import { SceneAuditor } from "../modules/scene-auditor.js";
 import { createAnalysisEngineFromEnv, type AnalysisEngine } from "../llm/analysis-engine.js";
 import { createPlanningEngineFromEnv, type PlanningEngine } from "../llm/planning-engine.js";
@@ -23,6 +24,7 @@ import type {
   WriterReviewArtifacts,
   WriterReviewArtifacts as RevisionArtifacts,
   SceneAuditReport,
+  SettlementOutputPaths,
   StorylabPlanResult,
   StorylabRevisionCycleResult,
   StorylabRevisionLoopIteration,
@@ -32,6 +34,24 @@ import type {
 
 function dedupeNumbers(values: ReadonlyArray<number>): ReadonlyArray<number> {
   return Array.from(new Set(values)).sort((left, right) => left - right);
+}
+
+function formatScores(scores: ChapterAnalysisBundle["readerReport"]["scores"]): string {
+  return `hook=${scores.hook}, momentum=${scores.momentum}, emotionalPeak=${scores.emotionalPeak}, suspense=${scores.suspense}, memorability=${scores.memorability}`;
+}
+
+function formatSceneIssues(issues: ReadonlyArray<SceneAuditReport["issues"][number]>): string {
+  if (issues.length === 0) {
+    return "无 scene audit 问题";
+  }
+
+  return issues
+    .map((issue) => `场景${issue.sceneNumber}[${issue.severity}] ${issue.problem}`)
+    .join("；");
+}
+
+function formatReasons(reasons: ReadonlyArray<string> | undefined): string {
+  return reasons && reasons.length > 0 ? reasons.join("；") : "无";
 }
 
 function collectSceneNumbersFromText(lines: ReadonlyArray<string>): ReadonlyArray<number> {
@@ -177,6 +197,18 @@ interface RevisionPassArtifacts {
   readonly revisionTrace: StorylabRevisionCycleResult["targetSceneNumbers"] extends ReadonlyArray<number> ? Awaited<ReturnType<ReviseEngine["revise"]>>["trace"] : never;
 }
 
+interface PrecomputedRevisionState {
+  readonly analysis: ChapterAnalysisBundle;
+  readonly sceneAudit: SceneAuditReport;
+  readonly blockingGate: BlockingGateStatus;
+}
+
+export interface StorylabProgressEvent {
+  readonly stage: "plan" | "writer" | "analysis" | "reader" | "revise" | "gate" | "persist" | "loop";
+  readonly detail: string;
+  readonly iteration?: number;
+}
+
 export class StorylabRunner {
   private readonly store: ProjectStore;
   private readonly historyBuilder = new HistoryBuilder();
@@ -187,14 +219,21 @@ export class StorylabRunner {
   private readonly planningEngine: PlanningEngine;
   private readonly sceneAuditor = new SceneAuditor();
   private readonly gatekeeper = new HumanReviewGatekeeper();
+  private readonly settlementAgent = new SettlementAgent();
+  private readonly progressReporter?: (event: StorylabProgressEvent) => void;
 
-  constructor(workspaceRoot: string) {
+  constructor(workspaceRoot: string, options?: { progressReporter?: (event: StorylabProgressEvent) => void }) {
     this.store = new ProjectStore(workspaceRoot);
     this.writerAgent = createWriterAgentFromEnv();
     this.reviseEngine = createReviseEngineFromEnv();
     this.analysisEngine = createAnalysisEngineFromEnv();
     this.readerEngine = createReaderCriticEngineFromEnv();
     this.planningEngine = createPlanningEngineFromEnv();
+    this.progressReporter = options?.progressReporter;
+  }
+
+  private report(stage: StorylabProgressEvent["stage"], detail: string, iteration?: number): void {
+    this.progressReporter?.({ stage, detail, iteration });
   }
 
   async run(bookId: string, chapterNumber: number): Promise<StorylabRunResult> {
@@ -245,11 +284,15 @@ export class StorylabRunner {
 
   async planNext(bookId: string, targetChapterNumber: number): Promise<StorylabPlanResult> {
     await this.store.ensureStoryDirs(bookId);
-    const [styleGuide, characterHistory, themeHistory, storyMemory, gates] = await Promise.all([
+    this.report("plan", `开始规划第 ${targetChapterNumber} 章`);
+    const [styleGuide, characterHistory, themeHistory, storyMemory, chapterSummaries, chronology, openLoops, gates] = await Promise.all([
       this.store.loadStyleGuide(bookId),
       this.store.loadCharacterHistory(bookId),
       this.store.loadThemeHistory(bookId),
       this.store.loadStoryMemory(bookId),
+      this.store.loadRecentChapterSummaries(bookId, 3),
+      this.store.loadChronology(bookId),
+      this.store.loadOpenLoops(bookId),
       this.store.loadHumanGates(bookId),
     ]);
 
@@ -258,6 +301,9 @@ export class StorylabRunner {
       characterHistory,
       themeHistory,
       memory: storyMemory,
+      chapterSummaries,
+      chronology,
+      openLoops,
       gates,
       styleGuide,
     });
@@ -279,6 +325,7 @@ export class StorylabRunner {
 
   async writerFromPlan(bookId: string, targetChapterNumber: number): Promise<StorylabWriterResult> {
     await this.store.ensureStoryDirs(bookId);
+    this.report("writer", `开始生成第 ${targetChapterNumber} 章工作稿`);
     const [plan, characterHistory, themeHistory] = await Promise.all([
       this.store.loadChapterPlan(bookId, targetChapterNumber),
       this.store.loadCharacterHistory(bookId),
@@ -291,6 +338,7 @@ export class StorylabRunner {
 
     const draft = await this.writerAgent.generate({ plan, characterHistory, themeHistory });
     const writerWorkingPath = await this.store.writeWriterWorking(bookId, draft);
+    this.report("writer", `第 ${targetChapterNumber} 章工作稿已写入`);
 
     return {
       bookId,
@@ -311,6 +359,7 @@ export class StorylabRunner {
 
   async writerCycle(bookId: string, targetChapterNumber: number, override = false): Promise<StorylabWriterCycleResult> {
     await this.store.ensureStoryDirs(bookId);
+    this.report("loop", `启动 writer-cycle，第 ${targetChapterNumber} 章`);
     const [writerResult, book, plan, characterSeeds, themeSeeds, styleGuide, gates] = await Promise.all([
       this.writerFromPlan(bookId, targetChapterNumber),
       this.store.loadBook(bookId),
@@ -336,6 +385,9 @@ export class StorylabRunner {
     );
     const sceneAudit = this.sceneAuditor.audit(plan.sceneBlueprint, analysis.scenes, writerText);
     const blockingGate = buildBlockingGateStatus({ analysis, sceneAudit });
+    this.report("gate", `writer-cycle gate blocking=${blockingGate.blocking}`);
+    this.report("gate", `writer-cycle reasons=${formatReasons(blockingGate.reasons)}`);
+    this.report("gate", `writer-cycle advisory=${formatReasons(blockingGate.advisoryReasons)}`);
     if (blockingGate.blocking && !override) {
       throw new Error(
         `Blocking gate triggered: ${blockingGate.reasons.join("; ")}. Blocking scenes: ${blockingGate.blockingScenes.map((entry) => `${entry.sceneNumber}(${entry.issueTypes.join(", ")})`).join("; ")}. Re-run with --override to continue.`,
@@ -356,6 +408,13 @@ export class StorylabRunner {
       revisionBriefPath: reviewArtifacts.revisionBriefPath,
       blockingGate,
       finalProsePath: null,
+      debug: {
+        readerScores: analysis.readerReport.scores,
+        readerSummary: analysis.readerReport.summary,
+        readerSuggestions: analysis.readerReport.revisionSuggestions,
+        sceneAuditIssues: sceneAudit.issues,
+        blockingReasons: blockingGate.reasons,
+      },
     };
   }
 
@@ -365,6 +424,7 @@ export class StorylabRunner {
 
   async reviseCycle(bookId: string, targetChapterNumber: number, override = false): Promise<StorylabRevisionCycleResult> {
     await this.store.ensureStoryDirs(bookId);
+    this.report("loop", `启动 revise-cycle，第 ${targetChapterNumber} 章`);
     const ctx = await this.loadRevisionPassContext(bookId, targetChapterNumber);
     const writerResult = await this.writerFromPlan(bookId, targetChapterNumber);
     const initialWriterText = await this.store.loadWriterWorkingContent(bookId, targetChapterNumber);
@@ -378,6 +438,9 @@ export class StorylabRunner {
 
     const pass = await this.executeRevisionPass(ctx, initialWriterDraft, override);
     const finalProsePath = pass.postRevisionGate.blocking ? null : await this.store.writeFinalProse(bookId, pass.revisedDraft);
+    const settlementPaths = finalProsePath
+      ? await this.settleAcceptedChapter(ctx, pass.revisedDraft, pass.afterAnalysis)
+      : null;
 
     return {
       bookId,
@@ -395,9 +458,22 @@ export class StorylabRunner {
       blockingGate: pass.blockingGate,
       postRevisionGate: pass.postRevisionGate,
       finalProsePath,
+      settlementPaths,
       targetSceneNumbers: pass.revisionTrace.targetSceneNumbers,
       actualRewrittenSceneNumbers: pass.revisionTrace.actualRewrittenSceneNumbers,
       comparisonSceneNumbers: pass.revisionTrace.comparisonSceneNumbers,
+      debug: {
+        beforeScores: pass.beforeAnalysis.readerReport.scores,
+        afterScores: pass.afterAnalysis.readerReport.scores,
+        beforeSummary: pass.beforeAnalysis.readerReport.summary,
+        afterSummary: pass.afterAnalysis.readerReport.summary,
+        beforeSuggestions: pass.beforeAnalysis.readerReport.revisionSuggestions,
+        afterSuggestions: pass.afterAnalysis.readerReport.revisionSuggestions,
+        beforeSceneAuditIssues: pass.beforeSceneAudit.issues,
+        afterSceneAuditIssues: pass.afterSceneAudit.issues,
+        blockingReasons: pass.blockingGate.reasons,
+        postRevisionReasons: pass.postRevisionGate.reasons,
+      },
     };
   }
 
@@ -407,6 +483,7 @@ export class StorylabRunner {
     options?: { override?: boolean; maxIterations?: number },
   ): Promise<StorylabRevisionLoopResult> {
     await this.store.ensureStoryDirs(bookId);
+    this.report("loop", `启动 revise-until-pass，第 ${targetChapterNumber} 章，最多 ${options?.maxIterations ?? 3} 轮`);
     const maxIterations = options?.maxIterations ?? 3;
     const override = options?.override ?? false;
     const ctx = await this.loadRevisionPassContext(bookId, targetChapterNumber);
@@ -424,35 +501,44 @@ export class StorylabRunner {
     let latestWriterWorkingPath = writerResult.writerWorkingPath;
     let finalProsePath: string | null = null;
     let stopReason = "达到最大迭代次数仍未过线";
+    let cachedBefore: PrecomputedRevisionState | null = null;
 
-    for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
-      const pass = await this.executeRevisionPass(ctx, currentDraft, override);
+      for (let iteration = 1; iteration <= maxIterations; iteration += 1) {
+      this.report("loop", `开始第 ${iteration} 轮修订`, iteration);
+      const pass = await this.executeRevisionPass(ctx, currentDraft, override, cachedBefore ?? undefined);
       latestWriterWorkingPath = pass.revisedWorkingPath;
 
-      iterations.push({
-        iteration,
-        beforeScores: pass.beforeAnalysis.readerReport.scores,
-        afterScores: pass.afterAnalysis.readerReport.scores,
-        blockingGate: pass.blockingGate,
-        postRevisionGate: pass.postRevisionGate,
-        targetSceneNumbers: pass.revisionTrace.targetSceneNumbers,
-        actualRewrittenSceneNumbers: pass.revisionTrace.actualRewrittenSceneNumbers,
-        comparisonSceneNumbers: pass.revisionTrace.comparisonSceneNumbers,
-        readerSummary: pass.afterAnalysis.readerReport.summary,
-        readerSuggestions: pass.afterAnalysis.readerReport.revisionSuggestions,
-      });
+        iterations.push({
+          iteration,
+          beforeScores: pass.beforeAnalysis.readerReport.scores,
+          afterScores: pass.afterAnalysis.readerReport.scores,
+          beforeSummary: pass.beforeAnalysis.readerReport.summary,
+          afterSummary: pass.afterAnalysis.readerReport.summary,
+          blockingGate: pass.blockingGate,
+          postRevisionGate: pass.postRevisionGate,
+          targetSceneNumbers: pass.revisionTrace.targetSceneNumbers,
+          actualRewrittenSceneNumbers: pass.revisionTrace.actualRewrittenSceneNumbers,
+          comparisonSceneNumbers: pass.revisionTrace.comparisonSceneNumbers,
+          beforeSuggestions: pass.beforeAnalysis.readerReport.revisionSuggestions,
+          afterSuggestions: pass.afterAnalysis.readerReport.revisionSuggestions,
+          beforeSceneAuditIssues: pass.beforeSceneAudit.issues,
+          afterSceneAuditIssues: pass.afterSceneAudit.issues,
+        });
 
-      if (!pass.postRevisionGate.blocking) {
-        finalProsePath = await this.store.writeFinalProse(bookId, pass.revisedDraft);
-        stopReason = `第 ${iteration} 轮后所有 gate 已通过`;
-        return {
-          bookId,
+        if (!pass.postRevisionGate.blocking) {
+          this.report("gate", `第 ${iteration} 轮后所有 gate 已通过`, iteration);
+          finalProsePath = await this.store.writeFinalProse(bookId, pass.revisedDraft);
+          const settlementPaths = await this.settleAcceptedChapter(ctx, pass.revisedDraft, pass.afterAnalysis);
+          stopReason = `第 ${iteration} 轮后所有 gate 已通过`;
+          return {
+            bookId,
           chapterNumber: targetChapterNumber,
           initialWriterWorkingPath: writerResult.writerWorkingPath,
-          latestWriterWorkingPath,
-          finalProsePath,
-          passed: true,
-          iterations,
+            latestWriterWorkingPath,
+            finalProsePath,
+            settlementPaths,
+            passed: true,
+            iterations,
           stopReason,
           maxIterations,
           writerProvider: this.writerAgent.name,
@@ -463,6 +549,7 @@ export class StorylabRunner {
       }
 
       if (pass.revisionTrace.actualRewrittenSceneNumbers.length === 0) {
+        this.report("gate", `第 ${iteration} 轮没有产生有效改写`, iteration);
         stopReason = `第 ${iteration} 轮未产生有效改写，停止继续循环`;
         break;
       }
@@ -477,23 +564,30 @@ export class StorylabRunner {
       const anyImproved = scoreDelta.some((delta) => delta > 0);
       const issueReduced = pass.beforeSceneAudit.issues.length > pass.afterSceneAudit.issues.length;
       if (!anyImproved && !issueReduced) {
+        this.report("gate", `第 ${iteration} 轮没有带来有效提升`, iteration);
         stopReason = `第 ${iteration} 轮没有带来有效提升，停止继续循环`;
         break;
       }
 
       currentDraft = pass.revisedDraft;
       currentText = pass.revisedDraft.content;
+      cachedBefore = {
+        analysis: pass.afterAnalysis,
+        sceneAudit: pass.afterSceneAudit,
+        blockingGate: pass.postRevisionGate,
+      };
       void currentText;
     }
 
-    return {
-      bookId,
-      chapterNumber: targetChapterNumber,
-      initialWriterWorkingPath: writerResult.writerWorkingPath,
-      latestWriterWorkingPath,
-      finalProsePath,
-      passed: false,
-      iterations,
+      return {
+        bookId,
+        chapterNumber: targetChapterNumber,
+        initialWriterWorkingPath: writerResult.writerWorkingPath,
+        latestWriterWorkingPath,
+        finalProsePath,
+        settlementPaths: null,
+        passed: false,
+        iterations,
       stopReason,
       maxIterations,
       writerProvider: this.writerAgent.name,
@@ -549,8 +643,9 @@ export class StorylabRunner {
     ctx: RevisionPassContext,
     currentDraft: ChapterDraft,
     override: boolean,
+    precomputedBefore?: PrecomputedRevisionState,
   ): Promise<RevisionPassArtifacts> {
-    const beforeAnalysis = await this.analyzeChapterText(
+    const beforeAnalysis = precomputedBefore?.analysis ?? await this.analyzeChapterText(
       ctx.chapterNumber,
       currentDraft.content,
       ctx.characterSeeds,
@@ -558,8 +653,17 @@ export class StorylabRunner {
       ctx.styleGuide,
       ctx.gates,
     );
-    const beforeSceneAudit = this.sceneAuditor.audit(ctx.plan.sceneBlueprint, beforeAnalysis.scenes, currentDraft.content);
-    const blockingGate = buildBlockingGateStatus({ analysis: beforeAnalysis, sceneAudit: beforeSceneAudit });
+    const beforeSceneAudit = precomputedBefore?.sceneAudit
+      ?? this.sceneAuditor.audit(ctx.plan.sceneBlueprint, beforeAnalysis.scenes, currentDraft.content);
+    const blockingGate = precomputedBefore?.blockingGate
+      ?? buildBlockingGateStatus({ analysis: beforeAnalysis, sceneAudit: beforeSceneAudit });
+    this.report("gate", `修订前 gate blocking=${blockingGate.blocking}`);
+    this.report("gate", `修订前 blocking reasons=${formatReasons(blockingGate.reasons)}`);
+    this.report("gate", `修订前 advisory reasons=${formatReasons(blockingGate.advisoryReasons)}`);
+    this.report("reader", `修订前评分：${formatScores(beforeAnalysis.readerReport.scores)}`);
+    this.report("reader", `修订前总结：${beforeAnalysis.readerReport.summary}`);
+    this.report("reader", `修订前建议：${beforeAnalysis.readerReport.revisionSuggestions.join("；") || "无"}`);
+    this.report("analysis", `修订前 scene audit：${formatSceneIssues(beforeSceneAudit.issues)}`);
     if (blockingGate.blocking && !override) {
       throw new Error(
         `Blocking gate triggered: ${blockingGate.reasons.join("; ")}. Blocking scenes: ${blockingGate.blockingScenes.map((entry) => `${entry.sceneNumber}(${entry.issueTypes.join(", ")})`).join("; ")}. Re-run with --override to continue.`,
@@ -574,10 +678,92 @@ export class StorylabRunner {
       beforeSceneAudit,
     );
 
+    if (!blockingGate.blocking) {
+      const revisedWorkingPath = await this.store.writeRevisedWriterWorking(ctx.bookId, currentDraft);
+      const revisedArtifacts = await this.writeRevisionArtifacts(
+        ctx.bookId,
+        ctx.chapterNumber,
+        ctx.book,
+        beforeAnalysis,
+        beforeSceneAudit,
+      );
+      const emptyTrace = {
+        targetSceneNumbers: [] as ReadonlyArray<number>,
+        actualRewrittenSceneNumbers: [] as ReadonlyArray<number>,
+        comparisonSceneNumbers: [] as ReadonlyArray<number>,
+        unchangedSceneNumbers: beforeAnalysis.scenes.map((scene) => scene.sceneNumber),
+        reviewedButNotRewrittenSceneNumbers: [] as ReadonlyArray<number>,
+        sceneRewriteMetadata: {},
+        sceneAlignment: {
+          mappingBasis: "当前版本已通过 gate，未执行 revise，before/after 共享同一份 scene 映射。",
+          beforeParsedSceneNumbers: beforeAnalysis.scenes.map((scene) => scene.sceneNumber),
+          afterParsedSceneNumbers: beforeAnalysis.scenes.map((scene) => scene.sceneNumber),
+          beforeAnalysisSceneNumbers: beforeAnalysis.scenes.map((scene) => scene.sceneNumber),
+          afterAnalysisSceneNumbers: beforeAnalysis.scenes.map((scene) => scene.sceneNumber),
+          stableByParsedScenes: true,
+          stableByAnalysisScenes: true,
+        },
+        summary: "当前版本已满足 pass 条件，未执行 scene-level revise。",
+        improved: [],
+        unresolved: [],
+        benefitSummary: ["no_meaningful_gain"] as const,
+        sceneChanges: [],
+        readerScoreDelta: {
+          hook: 0,
+          momentum: 0,
+          emotionalPeak: 0,
+          suspense: 0,
+          memorability: 0,
+        },
+        sceneIssueDelta: 0,
+      };
+      const comparisonPath = await this.store.writeOutput(
+        ctx.bookId,
+        "revisions",
+        this.store.chapterFileName(ctx.chapterNumber, "comparison.json"),
+        JSON.stringify(emptyTrace, null, 2),
+      );
+
+      return {
+        beforeAnalysis,
+        beforeSceneAudit,
+        blockingGate,
+        targetSceneNumbers: [],
+        revisedDraft: currentDraft,
+        revisedWorkingPath,
+        afterAnalysis: beforeAnalysis,
+        afterSceneAudit: beforeSceneAudit,
+        postRevisionGate: blockingGate,
+        comparisonPath,
+        reviewPath: beforeArtifacts.reviewPath,
+        revisedReviewPath: revisedArtifacts.reviewPath,
+        revisionTrace: {
+          targetSceneNumbers: [],
+          actualRewrittenSceneNumbers: [],
+          unchangedSceneNumbers: beforeAnalysis.scenes.map((scene) => scene.sceneNumber),
+          reviewedButNotRewrittenSceneNumbers: [],
+          comparisonSceneNumbers: [],
+          sceneRewriteMetadata: {},
+        },
+      };
+    }
+
     const targetSceneNumbers =
       blockingGate.blockingScenes.length > 0
-        ? blockingGate.blockingScenes.map((entry) => entry.sceneNumber)
+        ? (() => {
+            const blockingSet = new Set(blockingGate.blockingScenes.map((entry) => entry.sceneNumber));
+            const narrowed = selectRevisionTargetScenes(
+              ctx.plan,
+              {
+                sceneCoverageOk: beforeSceneAudit.sceneCoverageOk,
+                issues: beforeSceneAudit.issues.filter((issue) => blockingSet.has(issue.sceneNumber)),
+              },
+              beforeAnalysis,
+            );
+            return narrowed.length > 0 ? narrowed : Array.from(blockingSet).sort((left, right) => left - right).slice(0, 2);
+          })()
         : selectRevisionTargetScenes(ctx.plan, beforeSceneAudit, beforeAnalysis);
+    this.report("revise", `准备重写场景：${targetSceneNumbers.join(", ") || "无"}`);
 
     const revisionResult = await this.reviseEngine.revise({
       draft: currentDraft,
@@ -591,6 +777,7 @@ export class StorylabRunner {
     });
     const revisedDraft = revisionResult.draft;
     const revisedWorkingPath = await this.store.writeRevisedWriterWorking(ctx.bookId, revisedDraft);
+    this.report("revise", `局部重写完成，实际改写场景：${revisionResult.trace.actualRewrittenSceneNumbers.join(", ") || "无"}`);
 
     const afterAnalysis = await this.analyzeChapterText(
       ctx.chapterNumber,
@@ -602,6 +789,13 @@ export class StorylabRunner {
     );
     const afterSceneAudit = this.sceneAuditor.audit(ctx.plan.sceneBlueprint, afterAnalysis.scenes, revisedDraft.content);
     const postRevisionGate = buildBlockingGateStatus({ analysis: afterAnalysis, sceneAudit: afterSceneAudit });
+    this.report("gate", `修订后 gate blocking=${postRevisionGate.blocking}`);
+    this.report("gate", `修订后 blocking reasons=${formatReasons(postRevisionGate.reasons)}`);
+    this.report("gate", `修订后 advisory reasons=${formatReasons(postRevisionGate.advisoryReasons)}`);
+    this.report("reader", `修订后评分：${formatScores(afterAnalysis.readerReport.scores)}`);
+    this.report("reader", `修订后总结：${afterAnalysis.readerReport.summary}`);
+    this.report("reader", `修订后建议：${afterAnalysis.readerReport.revisionSuggestions.join("；") || "无"}`);
+    this.report("analysis", `修订后 scene audit：${formatSceneIssues(afterSceneAudit.issues)}`);
     const revisedArtifacts = await this.writeRevisionArtifacts(
       ctx.bookId,
       ctx.chapterNumber,
@@ -663,6 +857,7 @@ export class StorylabRunner {
     styleGuide: Awaited<ReturnType<ProjectStore["loadStyleGuide"]>>,
     gates: Awaited<ReturnType<ProjectStore["loadHumanGates"]>>,
   ): Promise<ChapterAnalysisBundle> {
+    this.report("analysis", `开始章节分析：第 ${chapterNumber} 章`);
     const coreAnalysis = await this.analysisEngine.analyze({
       chapterNumber,
       chapterText,
@@ -672,6 +867,7 @@ export class StorylabRunner {
       gates,
     });
 
+    this.report("reader", `开始 reader 评分：第 ${chapterNumber} 章`);
     const readerReport = await this.readerEngine.review({
       chapterNumber,
       chapterText,
@@ -687,6 +883,9 @@ export class StorylabRunner {
       characterStates: coreAnalysis.characterStates,
       themeReport: coreAnalysis.themeReport,
     });
+    this.report("reader", `reader 评分：${formatScores(readerReport.scores)}`);
+    this.report("reader", `reader 总结：${readerReport.summary}`);
+    this.report("reader", `reader 建议：${readerReport.revisionSuggestions.join("；") || "无"}`);
 
     return {
       ...coreAnalysis,
@@ -705,6 +904,7 @@ export class StorylabRunner {
     readonly previousThemeHistory: Awaited<ReturnType<ProjectStore["loadThemeHistory"]>>;
     readonly previousMemory: Awaited<ReturnType<ProjectStore["loadStoryMemory"]>>;
   }): Promise<ReadonlyArray<string>> {
+    this.report("persist", `写回第 ${params.chapterNumber} 章分析与跨章状态`);
     const characterHistory = this.historyBuilder.mergeCharacterHistory(
       params.previousCharacterHistory,
       params.analysis.characterStates,
@@ -781,6 +981,72 @@ export class StorylabRunner {
         JSON.stringify(storyMemory, null, 2),
       ),
     ]);
+  }
+
+  private async settleAcceptedChapter(
+    ctx: RevisionPassContext,
+    draft: ChapterDraft,
+    analysis: ChapterAnalysisBundle,
+  ): Promise<SettlementOutputPaths> {
+    this.report("persist", `开始结算第 ${ctx.chapterNumber} 章最终正文`);
+    await this.persistChapterAnalysis({
+      bookId: ctx.bookId,
+      book: ctx.book,
+      chapterNumber: ctx.chapterNumber,
+      analysis,
+      previousCharacterHistory: ctx.previousCharacterHistory,
+      previousThemeHistory: ctx.previousThemeHistory,
+      previousMemory: ctx.previousMemory,
+    });
+
+    const [previousChronology, previousOpenLoops] = await Promise.all([
+      this.store.loadChronology(ctx.bookId),
+      this.store.loadOpenLoops(ctx.bookId),
+    ]);
+
+    const settlement = this.settlementAgent.settle({
+      chapterNumber: ctx.chapterNumber,
+      draft,
+      plan: ctx.plan,
+      analysis,
+      previousChronology,
+      previousOpenLoops,
+    });
+
+    const [chapterSummaryPath, stateDeltaPath, chronologyPath, openLoopsPath] = await Promise.all([
+      this.store.writeOutput(
+        ctx.bookId,
+        "settlement",
+        this.store.chapterFileName(ctx.chapterNumber, "chapter-summary.json"),
+        JSON.stringify(settlement.chapterSummary, null, 2),
+      ),
+      this.store.writeOutput(
+        ctx.bookId,
+        "settlement",
+        this.store.chapterFileName(ctx.chapterNumber, "chapter-state-delta.json"),
+        JSON.stringify(settlement.chapterStateDelta, null, 2),
+      ),
+      this.store.writeOutput(
+        ctx.bookId,
+        "plot",
+        "chronology.json",
+        JSON.stringify(settlement.chronology, null, 2),
+      ),
+      this.store.writeOutput(
+        ctx.bookId,
+        "plot",
+        "open-loops.json",
+        JSON.stringify(settlement.openLoops, null, 2),
+      ),
+    ]);
+    this.report("persist", `第 ${ctx.chapterNumber} 章 settlement 已写回 summary/state-delta/chronology/open-loops`);
+
+    return {
+      chapterSummaryPath,
+      stateDeltaPath,
+      chronologyPath,
+      openLoopsPath,
+    };
   }
 
   private async writeWriterReviewArtifacts(

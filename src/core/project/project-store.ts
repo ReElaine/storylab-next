@@ -4,9 +4,12 @@ import type {
   BookRecord,
   ChapterDraft,
   ChapterPlan,
+  ChapterSummaryRecord,
   CharacterHistory,
   CharacterSeed,
+  ChronologyLedger,
   HumanGate,
+  OpenLoopsLedger,
   StoryMemory,
   StyleGuide,
   ThemeHistory,
@@ -117,6 +120,8 @@ export class ProjectStore {
       mkdir(join(storyDir, "human-gates"), { recursive: true }),
       mkdir(join(storyDir, "planning"), { recursive: true }),
       mkdir(join(storyDir, "memory"), { recursive: true }),
+      mkdir(join(storyDir, "settlement"), { recursive: true }),
+      mkdir(join(storyDir, "plot"), { recursive: true }),
       mkdir(join(storyDir, "writers-internal"), { recursive: true }),
       mkdir(join(storyDir, "drafts-internal"), { recursive: true }),
       mkdir(join(storyDir, "revisions", "internal"), { recursive: true }),
@@ -155,6 +160,33 @@ export class ProjectStore {
         averageMomentumScore: 0,
         averageEmotionalPeakScore: 0,
       },
+    });
+  }
+
+  async loadRecentChapterSummaries(bookId: string, limit = 3): Promise<ReadonlyArray<ChapterSummaryRecord>> {
+    const settlementDir = join(this.storyDir(bookId), "settlement");
+    try {
+      const files = (await readdir(settlementDir))
+        .filter((file: string) => file.endsWith(".chapter-summary.json"))
+        .sort((left, right) => left.localeCompare(right, "zh-Hans-CN"));
+      const selected = files.slice(-limit);
+      return Promise.all(
+        selected.map((file) => this.readJson<ChapterSummaryRecord>(join(settlementDir, file))),
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  async loadChronology(bookId: string): Promise<ChronologyLedger> {
+    return this.readJsonOrDefault(join(this.storyDir(bookId), "plot", "chronology.json"), {
+      events: [],
+    });
+  }
+
+  async loadOpenLoops(bookId: string): Promise<OpenLoopsLedger> {
+    return this.readJsonOrDefault(join(this.storyDir(bookId), "plot", "open-loops.json"), {
+      loops: [],
     });
   }
 

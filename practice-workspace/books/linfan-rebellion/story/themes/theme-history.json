@@ -148,7 +148,55 @@
       "chapterNumber": 1,
       "theme": "弱者想要改变命运，必须付出代价",
       "antiTheme": "只要抓住一次机会，弱者就能无损翻盘",
-      "themeSignalCount": 21,
+      "themeSignalCount": 6,
+      "antiSignalCount": 0,
+      "interpretation": "本章让主题方向先于事件被读者感知"
+    },
+    {
+      "chapterNumber": 1,
+      "theme": "弱者想要改变命运，必须付出代价",
+      "antiTheme": "只要抓住一次机会，弱者就能无损翻盘",
+      "themeSignalCount": 8,
+      "antiSignalCount": 0,
+      "interpretation": "本章让主题方向先于事件被读者感知"
+    },
+    {
+      "chapterNumber": 1,
+      "theme": "弱者想要改变命运，必须付出代价",
+      "antiTheme": "只要抓住一次机会，弱者就能无损翻盘",
+      "themeSignalCount": 10,
+      "antiSignalCount": 0,
+      "interpretation": "本章让主题方向先于事件被读者感知"
+    },
+    {
+      "chapterNumber": 1,
+      "theme": "弱者想要改变命运，必须付出代价",
+      "antiTheme": "只要抓住一次机会，弱者就能无损翻盘",
+      "themeSignalCount": 8,
+      "antiSignalCount": 0,
+      "interpretation": "本章让主题方向先于事件被读者感知"
+    },
+    {
+      "chapterNumber": 1,
+      "theme": "弱者想要改变命运，必须付出代价",
+      "antiTheme": "只要抓住一次机会，弱者就能无损翻盘",
+      "themeSignalCount": 5,
+      "antiSignalCount": 0,
+      "interpretation": "本章让主题方向先于事件被读者感知"
+    },
+    {
+      "chapterNumber": 1,
+      "theme": "弱者想要改变命运，必须付出代价",
+      "antiTheme": "只要抓住一次机会，弱者就能无损翻盘",
+      "themeSignalCount": 5,
+      "antiSignalCount": 0,
+      "interpretation": "本章让主题方向先于事件被读者感知"
+    },
+    {
+      "chapterNumber": 1,
+      "theme": "弱者想要改变命运，必须付出代价",
+      "antiTheme": "只要抓住一次机会，弱者就能无损翻盘",
+      "themeSignalCount": 20,
       "antiSignalCount": 0,
       "interpretation": "本章让主题方向先于事件被读者感知"
     }

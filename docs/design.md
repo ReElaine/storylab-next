@@ -55,10 +55,12 @@
 - `ChapterPlanner`
 - `WriterGenerator`（实现仍位于 `src/core/modules/draft-generator.ts`）
 - `SceneAuditor`
+- `SettlementAgent`
 
 ### Engine 层
 
 - `HeuristicAnalysisEngine` / `OpenAIAnalysisEngine`
+- `HeuristicReaderCriticEngine` / `OpenAIReaderCriticEngine`
 - `HeuristicPlanningEngine` / `OpenAIPlanningEngine`
 - `HeuristicWriterAgent` / `OpenAIWriterAgent`
 - `HeuristicReviseEngine` / `OpenAIReviseEngine`
@@ -191,6 +193,14 @@ flowchart TD
 - `CharacterHistory`
 - `ThemeHistory`
 - `StoryMemory`
+- `ChapterSummaryRecord`
+- `ChapterStateDelta`
+- `ChronologyLedger`
+- `OpenLoopsLedger`
+
+后续跨章连续写作升级路线详见：
+
+- [跨章连续写作路线](/C:/Working/storylab-next/docs/cross-chapter-continuity.md)
 
 章节规划：
 
@@ -203,6 +213,57 @@ flowchart TD
 - `RevisionTrace`
 - `RevisionComparisonReport`
 - `SceneRevisionExplanation`
+
+## 跨章连续写作升级方向
+
+当前项目已经有基础跨章状态，但还没有真正完成“整本书连续创作架构”。
+
+这条升级路线的目标架构可以概括为：
+
+- `5 层状态`
+- `2 层执行流`
+
+其中：
+
+- `5 层状态` 是：
+  - 静态设定层
+  - 全书动态状态层
+  - 章节层
+  - Scene 层
+  - 运行时上下文层
+- `2 层执行流` 是：
+  - 文本生产流
+  - 状态结算流
+
+当前更准确的项目定位是：
+
+- 我们已经把“文本生产流”做得比较完整
+- 但“状态结算流”仍在补齐中
+- 当前最强的是 `Scene 层` 和“章节生产单元”
+- 当前最弱的是“全书记账”与“canonical state commit”
+
+下一条明确升级路线是：
+
+1. `Settlement Layer`
+   - 在 `final prose` 后正式生成 `chapter_summary / state_delta / chronology / open_loops`
+2. `State-Driven Planning`
+   - 让 `plan-next` 基于状态账本，而不是只依赖前文拼接
+3. `Continuity Audit`
+   - 新增独立于 reader 的 continuity gate
+4. `Re-settlement`
+   - revise 后重新结算状态，只认最终正文对应的账本
+
+这条路线不会替换当前单章主链，而是接在当前主链之后：
+
+`plan -> writer -> analysis -> reader -> revise -> gate -> final prose -> settlement -> continuity audit -> plan next chapter`
+
+当前已经落地的部分是 `Phase 1: Settlement Layer` 初版：
+
+- final prose 后生成 `chapter_summary`
+- final prose 后生成 `chapter_state_delta`
+- 增量写回 `chronology`
+- 增量写回 `open_loops`
+- `plan-next` 开始读取 recent chapter summaries / chronology / open loops
 
 ## Character / Theme / Style 如何进入主链
 
@@ -331,6 +392,7 @@ Theme 进入主链的方式是：
 ### revise 行为
 
 - 优先只处理 blocking scenes 或 target scenes
+- 整条 revise 闭环按串行顺序运行，不并行触发多个 LLM agent
 - 不改其他 scene
 - 只替换目标 scene 文本
 - 保持 prelude / unchanged scenes / postlude
@@ -381,21 +443,56 @@ Theme 进入主链的方式是：
 
 ## Blocking Gate 最小版
 
-当前已经引入最小 blocking gate：
+当前 gate 采用 `reader` 优先策略。
 
-- 如果 `reader experience` 关键分数过低
-- 或 `scene audit` 出现 `high severity` 问题
+第一层是 `reader gate`：
 
-则：
+- `hook >= 6`
+- `momentum >= 6`
+- `emotionalPeak >= 6`
+- `suspense >= 6`
+- `memorability >= 6`
 
-- `writer-cycle` / `revise-cycle` 返回 blocking 状态
-- 默认阻断继续
-- 必须显式传入 `--override` 才能继续
+第二层是 `scene audit gate`：
 
-而且 gate 现在会指出：
+- 如果只剩质量型问题，例如“无决策 / 无代价 / 主题偏弱 / 爽点不足”，在 reader 已过线时会降为 `advisory`
+- 只有硬结构问题会继续阻断，例如：
+  - scene 漏写或计划覆盖失败
+  - scene 边界错乱
+  - 严重 POV 漂移
 
-- 哪些 scene 导致 blocking
-- 严重问题类型是什么
+因此当前行为是：
+
+- `writer-cycle` / `revise-cycle` / `revise-until-pass` 默认先看 reader 是否过线
+- 如果 reader 已过线且不存在硬结构阻断，系统可以直接通过，不再继续 revise
+- 只有在 gate 仍为 blocking 时，才继续进入 scene-level revise
+
+## 串行执行、进度与重试
+
+当前自动循环不做并行 LLM 调度，而是严格串行执行：
+
+`writer -> analysis -> reader -> scene audit -> revise -> re-analysis -> re-reader -> gate`
+
+这样做的目的有两个：
+
+- 保证每一步都建立在上一轮稳定产物之上
+- 让调试信息、scene traceability 与 comparison 保持一致
+
+CLI 在运行时会输出：
+
+- 当前阶段
+- reader 分数
+- reader summary 与建议
+- scene audit 问题
+- target scene / actual rewritten scene
+- retry 日志
+
+LLM 链路当前还内置了：
+
+- timeout
+- retry
+- 脏 JSON 修复
+- heuristic fallback
 
 ## 当前边界
 

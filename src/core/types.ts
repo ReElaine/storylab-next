@@ -161,6 +161,89 @@ export interface StoryMemory {
   };
 }
 
+export interface ChapterSummaryRecord {
+  readonly chapterNumber: number;
+  readonly title: string;
+  readonly summary: string;
+  readonly keyEvents: ReadonlyArray<string>;
+  readonly changedCharacters: ReadonlyArray<{
+    readonly name: string;
+    readonly summary: string;
+    readonly recentDecision: string;
+    readonly decisionCost: string;
+  }>;
+  readonly openedLoopIds: ReadonlyArray<string>;
+  readonly advancedLoopIds: ReadonlyArray<string>;
+  readonly closedLoopIds: ReadonlyArray<string>;
+}
+
+export interface ChronologyEvent {
+  readonly eventId: string;
+  readonly chapterNumber: number;
+  readonly sceneNumber: number | null;
+  readonly sceneId?: string;
+  readonly actors: ReadonlyArray<string>;
+  readonly summary: string;
+  readonly consequence: string;
+}
+
+export interface ChronologyLedger {
+  readonly events: ReadonlyArray<ChronologyEvent>;
+}
+
+export interface OpenLoopEntry {
+  readonly loopId: string;
+  readonly type: "foreshadow" | "promise" | "question" | "debt" | "threat" | "mystery";
+  readonly introducedInChapter: number;
+  readonly owner: string;
+  readonly description: string;
+  readonly expectedPayoffWindow: "soon" | "mid" | "long";
+  readonly urgency: "low" | "medium" | "high";
+  readonly status: "open" | "advanced" | "closed";
+  readonly payoffConstraints: ReadonlyArray<string>;
+  readonly relatedEntities: ReadonlyArray<string>;
+  readonly evidenceRefs: ReadonlyArray<string>;
+  readonly lastUpdatedChapter: number;
+}
+
+export interface OpenLoopsLedger {
+  readonly loops: ReadonlyArray<OpenLoopEntry>;
+}
+
+export interface ChapterStateDelta {
+  readonly chapterNumber: number;
+  readonly title: string;
+  readonly changedCharacters: ReadonlyArray<{
+    readonly name: string;
+    readonly currentDecision: string;
+    readonly decisionCost: string;
+    readonly arcProgress: string;
+    readonly summary: string;
+  }>;
+  readonly chronologyInsertions: ReadonlyArray<ChronologyEvent>;
+  readonly updatedLoops: ReadonlyArray<{
+    readonly loopId: string;
+    readonly action: "opened" | "advanced" | "closed";
+    readonly description: string;
+    readonly evidence: string;
+  }>;
+  readonly stateHighlights: ReadonlyArray<string>;
+}
+
+export interface SettlementBundle {
+  readonly chapterSummary: ChapterSummaryRecord;
+  readonly chapterStateDelta: ChapterStateDelta;
+  readonly chronology: ChronologyLedger;
+  readonly openLoops: OpenLoopsLedger;
+}
+
+export interface SettlementOutputPaths {
+  readonly chapterSummaryPath: string;
+  readonly stateDeltaPath: string;
+  readonly chronologyPath: string;
+  readonly openLoopsPath: string;
+}
+
 export interface SceneBlueprintItem {
   readonly sceneId: string;
   readonly sceneAnchor: string;
@@ -264,7 +347,13 @@ export interface SceneAuditReport {
 export interface BlockingGateStatus {
   readonly blocking: boolean;
   readonly reasons: ReadonlyArray<string>;
+  readonly advisoryReasons?: ReadonlyArray<string>;
+  readonly readerPassed?: boolean;
   readonly blockingScenes: ReadonlyArray<{
+    readonly sceneNumber: number;
+    readonly issueTypes: ReadonlyArray<string>;
+  }>;
+  readonly advisoryScenes?: ReadonlyArray<{
     readonly sceneNumber: number;
     readonly issueTypes: ReadonlyArray<string>;
   }>;
@@ -408,6 +497,13 @@ export interface StorylabWriterCycleResult {
   readonly revisionBriefPath: string;
   readonly blockingGate: BlockingGateStatus;
   readonly finalProsePath: string | null;
+  readonly debug: {
+    readonly readerScores: ReaderExperienceReport["scores"];
+    readonly readerSummary: string;
+    readonly readerSuggestions: ReadonlyArray<string>;
+    readonly sceneAuditIssues: ReadonlyArray<SceneAuditIssue>;
+    readonly blockingReasons: ReadonlyArray<string>;
+  };
 }
 
 export type StorylabDraftResult = StorylabWriterResult;
@@ -430,22 +526,39 @@ export interface StorylabRevisionCycleResult {
   readonly blockingGate: BlockingGateStatus;
   readonly postRevisionGate: BlockingGateStatus;
   readonly finalProsePath: string | null;
+  readonly settlementPaths: SettlementOutputPaths | null;
   readonly targetSceneNumbers: ReadonlyArray<number>;
   readonly actualRewrittenSceneNumbers: ReadonlyArray<number>;
   readonly comparisonSceneNumbers: ReadonlyArray<number>;
+  readonly debug: {
+    readonly beforeScores: ReaderExperienceReport["scores"];
+    readonly afterScores: ReaderExperienceReport["scores"];
+    readonly beforeSummary: string;
+    readonly afterSummary: string;
+    readonly beforeSuggestions: ReadonlyArray<string>;
+    readonly afterSuggestions: ReadonlyArray<string>;
+    readonly beforeSceneAuditIssues: ReadonlyArray<SceneAuditIssue>;
+    readonly afterSceneAuditIssues: ReadonlyArray<SceneAuditIssue>;
+    readonly blockingReasons: ReadonlyArray<string>;
+    readonly postRevisionReasons: ReadonlyArray<string>;
+  };
 }
 
 export interface StorylabRevisionLoopIteration {
   readonly iteration: number;
   readonly beforeScores: ReaderExperienceReport["scores"];
   readonly afterScores: ReaderExperienceReport["scores"];
+  readonly beforeSummary: string;
+  readonly afterSummary: string;
   readonly blockingGate: BlockingGateStatus;
   readonly postRevisionGate: BlockingGateStatus;
   readonly targetSceneNumbers: ReadonlyArray<number>;
   readonly actualRewrittenSceneNumbers: ReadonlyArray<number>;
   readonly comparisonSceneNumbers: ReadonlyArray<number>;
-  readonly readerSummary: string;
-  readonly readerSuggestions: ReadonlyArray<string>;
+  readonly beforeSuggestions: ReadonlyArray<string>;
+  readonly afterSuggestions: ReadonlyArray<string>;
+  readonly beforeSceneAuditIssues: ReadonlyArray<SceneAuditIssue>;
+  readonly afterSceneAuditIssues: ReadonlyArray<SceneAuditIssue>;
 }
 
 export interface StorylabRevisionLoopResult {
@@ -454,6 +567,7 @@ export interface StorylabRevisionLoopResult {
   readonly initialWriterWorkingPath: string;
   readonly latestWriterWorkingPath: string;
   readonly finalProsePath: string | null;
+  readonly settlementPaths: SettlementOutputPaths | null;
   readonly passed: boolean;
   readonly iterations: ReadonlyArray<StorylabRevisionLoopIteration>;
   readonly stopReason: string;

@@ -129,6 +129,11 @@ node dist/index.js revise-cycle <workspaceDir> <bookId> <targetChapterNumber> [-
 最终正文：
 
 - 只有 `postRevisionGate` 通过时，才写 `final/*.txt`
+- 写出 `final/*.txt` 后，会继续执行 settlement：
+  - `chapter-summary`
+  - `chapter-state-delta`
+  - `chronology`
+  - `open-loops`
 
 ## 6. `revise-until-pass`
 
@@ -141,20 +146,39 @@ node dist/index.js revise-until-pass <workspaceDir> <bookId> <targetChapterNumbe
 1. `analysis agent`
 2. `reader agent`
 3. `scene auditor`
-4. `revise agent`
-5. `re-analysis`
-6. `re-reader`
-7. `comparison`
+4. `blocking gate`
+5. 如果仍然 blocking，再调用 `revise agent`
+6. `re-analysis`
+7. `re-reader`
+8. `comparison`
+
+说明：
+
+- 整条链按串行执行，不并行调用多个 LLM agent
+- CLI 会输出阶段进度、reader 分数、修改建议、scene audit 问题和 retry 日志
+- 如果当前版本已经通过 gate，会直接停止，不进入 revise
 
 停止条件：
 
 - 所有 reader 分数都 `>= 6`
-- `scene audit` 无 `high severity`
+- 不存在硬结构阻断问题
 - 或达到最大轮次
 - 或本轮没有实际改写
 - 或本轮没有产生有效提升
+
+reader 优先规则：
+
+- 如果 reader 已过线，而 scene audit 只剩质量型 high severity 问题，这些问题会降为 `advisory`
+- 只有 scene 漏写、scene 边界错乱、严重 POV 漂移等硬结构问题继续阻断最终导出
 
 最终导出：
 
 - 通过时：`books/<bookId>/final/*.txt`
 - 未通过时：`finalProsePath = null`
+
+通过后的额外持久化：
+
+- `books/<bookId>/story/settlement/chapter-XXXX.chapter-summary.json`
+- `books/<bookId>/story/settlement/chapter-XXXX.chapter-state-delta.json`
+- `books/<bookId>/story/plot/chronology.json`
+- `books/<bookId>/story/plot/open-loops.json`

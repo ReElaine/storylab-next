@@ -9,6 +9,13 @@
 - 读者体验独立评分
 - 自动循环修订，直到过线或停止
 - 只有全部关键环节通过后，才导出最终正文 `.txt`
+- 串行 LLM 工作流、阶段进度输出与统一 retry 机制
+- Phase 1 Settlement Layer 初版：final prose 后生成 summary / state delta / chronology / open loops
+
+当前中短期关注的是“单章质量闭环”，但项目已经正式记录了下一条升级路线：
+
+- 跨章连续写作与状态结算架构
+  - 包含目标架构、当前差异和下一步开发计划
 
 ## 当前工作流
 
@@ -86,8 +93,15 @@ STORYLAB_OPENAI_BASE_URL=https://your-compatible-endpoint/v1
 - 最终正文
   - 面向读者
   - 不显示 `场景 / POV` 标签
-  - 只在所有关键 gate 通过后导出
+  - 只在 `reader` 过线且不存在硬结构阻断时导出
   - 落在 `books/<bookId>/final/*.txt`
+
+- settlement 账本
+  - 只在 final prose 导出后正式写回
+  - `books/<bookId>/story/settlement/chapter-XXXX.chapter-summary.json`
+  - `books/<bookId>/story/settlement/chapter-XXXX.chapter-state-delta.json`
+  - `books/<bookId>/story/plot/chronology.json`
+  - `books/<bookId>/story/plot/open-loops.json`
 
 如果修订后仍未过线，则：
 
@@ -104,13 +118,32 @@ STORYLAB_OPENAI_BASE_URL=https://your-compatible-endpoint/v1
 - `suspense >= 6`
 - `memorability >= 6`
 
-同时还必须满足：
+同时系统会继续检查 `scene audit`，但当前采用 `reader` 优先策略：
 
-- `scene audit` 没有 `high severity` 问题
+- 如果 reader 五项全部过线，而 `scene audit` 只剩“无决策 / 无代价 / 主题偏弱”这类质量问题，这些问题会被降为 `advisory`
+- 只有真正的硬结构问题仍然会阻断最终正文导出，例如：
+  - scene 漏写或计划覆盖失败
+  - scene 边界错乱
+  - 严重 POV 漂移
+
+## 运行与调试
+
+当前 `writer-cycle / revise-cycle / revise-until-pass` 都是串行执行：
+
+`writer -> analysis -> reader -> scene audit -> revise -> re-analysis -> re-reader -> gate`
+
+CLI 会把阶段进度、reader 分数、修改建议、scene audit 问题、target scene 与 retry 日志输出到 `stderr`，而最终 JSON 结果继续输出到 `stdout`。
+
+OpenAI 兼容链路已经内置：
+
+- 超时控制
+- retry
+- JSON 修复与 fallback
 
 ## 文档
 
 - [项目阶段总览](./docs/project-stages.md)
+- [跨章连续写作路线](./docs/cross-chapter-continuity.md)
 - [详细设计](./docs/design.md)
 - [调用链说明](./docs/call-flows.md)
 - [使用说明](./docs/usage.md)

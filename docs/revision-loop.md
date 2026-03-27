@@ -14,6 +14,12 @@
 
 `analysis -> critique -> revision brief -> scene-level revise -> re-analysis -> comparison -> persist`
 
+当前实际运行方式：
+
+- 串行执行
+- 每个阶段输出进度与 debug 信息
+- LLM 调用带 timeout / retry / JSON 修复
+
 ## 1. 命令入口
 
 ```bash
@@ -70,9 +76,12 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2 --override
 - character states
 - theme report
 - style report
-- reader experience report
 - gate decision
 - revision brief
+
+说明：
+
+- `reader report` 现在由独立 `reader agent` 生成，不再混在 `analysis` 输出里
 
 ### 第四步：scene audit
 
@@ -90,7 +99,20 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2 --override
 - 是否主题冲突不足
 - 是否 POV 漂移
 
-### 第五步：scene-level revise
+### 第五步：reader gate 与是否进入 revise
+
+在进入 revise 前，系统先检查：
+
+- `reader` 五项分数是否全部 `>= 6`
+- 是否仍存在硬结构阻断问题
+
+当前采用 `reader` 优先策略：
+
+- 如果 reader 已过线，而 scene audit 只剩质量型问题，这些问题会降为 `advisory`
+- 如果当前版本已经通过 gate，本轮会直接跳过 revise，进入 comparison 与 persist
+- 只有 gate 仍为 blocking 时，才继续进入 scene-level revise
+
+### 第六步：scene-level revise
 
 调用：
 
@@ -123,14 +145,15 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2 --override
 - revised writer working
 - revision trace
 
-### 第六步：re-analysis
+### 第七步：re-analysis
 
 对修订后正文再次调用：
 
 - `analysis engine`
 - `scene auditor`
+- `reader agent`
 
-### 第七步：comparison
+### 第八步：comparison
 
 输出 `comparison.json`，当前包含两层：
 
@@ -144,7 +167,7 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2 --override
 - 文本级 change evidence
 - post-rewrite assessment
 
-### 第八步：persist
+### 第九步：persist
 
 把修订后的 analysis 结果重新写回：
 
@@ -163,6 +186,10 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2 --override
 - `story/revisions/internal/`
 - `story/reviews/revisions/`
 - `story/revisions/`
+
+同时如果当前版本已经通过 gate，则会额外导出：
+
+- `final/*.txt`
 
 ## 4. 当前输出文件
 
@@ -193,6 +220,7 @@ revised writer working：
 - before / after 已经有结构化 comparison
 - 修订后结果会写回 history 与 memory
 - blocking gate 已经能够中断流程并指出阻断 scene
+- reader 已过线时，系统不会继续盲目 revise 把已达标文本修坏
 
 ## 6. 当前边界
 
@@ -202,6 +230,7 @@ revised writer working：
 - style control 还没有完全内化到所有局部重写中
 - character/theme 驱动的局部改写还可以继续做细
 - comparison 还不是完整 scene diff 可视化
+- 全 LLM 串行链路仍然偏慢，writer 与 analysis 是主要耗时项
 
 ## 7. 下一步最值得强化的点
 

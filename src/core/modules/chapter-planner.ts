@@ -1,7 +1,10 @@
 import type {
   ChapterPlan,
+  ChapterSummaryRecord,
   CharacterHistory,
+  ChronologyLedger,
   HumanGate,
+  OpenLoopsLedger,
   SceneBlueprintItem,
   StoryMemory,
   StyleGuide,
@@ -9,9 +12,22 @@ import type {
   ThemeHistory,
 } from "../types.js";
 
-function buildMission(memory: StoryMemory): string {
+function buildMission(
+  memory: StoryMemory,
+  chapterSummaries: ReadonlyArray<ChapterSummaryRecord>,
+  openLoops: OpenLoopsLedger,
+): string {
+  const urgentLoop = openLoops.loops.find((loop) => loop.status !== "closed" && loop.urgency === "high")
+    ?? openLoops.loops.find((loop) => loop.status !== "closed");
+  if (urgentLoop) {
+    return `承接未兑现事项“${urgentLoop.description}”，并把它推进成更明确的章节行动。`;
+  }
   if (memory.activeHooks.length > 0) {
     return `推进 ${memory.activeHooks[0]}，同时把上一章遗留的不安转化为更明确的行动。`;
+  }
+  const latestSummary = chapterSummaries.at(-1);
+  if (latestSummary) {
+    return `承接上一章“${latestSummary.summary}”留下的局面，推动角色进入下一轮冲突。`;
   }
   return "让角色从当前状态进入下一轮更具体的冲突。";
 }
@@ -37,26 +53,37 @@ function buildSceneBlueprint(
   characterHistory: ReadonlyArray<CharacterHistory>,
   themeHistory: ThemeHistory,
   styleProfile: StyleProfile,
+  chapterSummaries: ReadonlyArray<ChapterSummaryRecord>,
+  chronology: ChronologyLedger,
+  openLoops: OpenLoopsLedger,
 ): ReadonlyArray<SceneBlueprintItem> {
   const lead = characterHistory[0]?.latestState;
   const obstacle = characterHistory[1]?.latestState;
   const latestTheme = themeHistory.timeline[themeHistory.timeline.length - 1];
+  const latestSummary = chapterSummaries.at(-1);
+  const urgentLoop = openLoops.loops.find((loop) => loop.status !== "closed" && loop.urgency === "high")
+    ?? openLoops.loops.find((loop) => loop.status !== "closed");
+  const recentEvent = chronology.events.at(-1);
   const leadName = lead?.name ?? "主角";
   const opposingName = obstacle?.name ?? "阻碍者";
   const theme = latestTheme?.theme ?? "代价与亲密";
   const antiTheme = latestTheme?.antiTheme ?? "力量可以无损获得";
   const valueConflict = latestTheme?.interpretation ?? "控制自己 vs 接受他人介入";
+  const carryForward = urgentLoop?.description
+    ?? latestSummary?.summary
+    ?? recentEvent?.summary
+    ?? "上一章遗留的问题";
 
   return [
     {
       ...buildSceneIdentity(1, leadName),
       sceneNumber: 1,
       pov: leadName,
-      goal: `${leadName}试图主动推进当前悬念`,
+      goal: `${leadName}试图主动推进“${carryForward}”`,
       conflict: `${opposingName}让目标必须伴随代价`,
       turn: `${leadName}意识到当前误判正在放大风险`,
       result: `${leadName}被迫继续推进，而不是原地观望`,
-      newInformation: ["上一章遗留的问题出现了更具体的新解释"],
+      newInformation: [`上一章遗留的问题“${carryForward}”出现了更具体的新解释`],
       emotionalShift: "试探 -> 紧张",
       drivingCharacter: leadName,
       opposingForce: opposingName,
@@ -73,11 +100,11 @@ function buildSceneBlueprint(
       ...buildSceneIdentity(2, leadName),
       sceneNumber: 2,
       pov: leadName,
-      goal: `让 ${leadName} 做出一次无法完全回撤的选择`,
+      goal: `让 ${leadName} 围绕“${carryForward}”做出一次无法完全回撤的选择`,
       conflict: `${opposingName}逼迫角色明确站队`,
       turn: `关系压力升级，${leadName}必须付出代价`,
       result: "人物关系出现位移，章节冲突被推高",
-      newInformation: ["新的事实改变了角色对风险的判断"],
+      newInformation: ["新的事实改变了角色对风险的判断，并推进既有 open loop"],
       emotionalShift: "紧张 -> 压迫",
       drivingCharacter: leadName,
       opposingForce: opposingName,
@@ -94,7 +121,7 @@ function buildSceneBlueprint(
       ...buildSceneIdentity(3, leadName),
       sceneNumber: 3,
       pov: leadName,
-      goal: "把章节推到一个更强的尾钩",
+      goal: "把本章推进到更强的尾钩，同时为下一章留下必须承接的状态",
       conflict: `${theme} 与 ${antiTheme} 正面碰撞`,
       turn: "一个关键信息让角色意识到代价已经开始兑现",
       result: "留下一个必须进入下一章解决的问题",
@@ -120,6 +147,9 @@ export class ChapterPlanner {
     characterHistory: ReadonlyArray<CharacterHistory>,
     themeHistory: ThemeHistory,
     memory: StoryMemory,
+    chapterSummaries: ReadonlyArray<ChapterSummaryRecord>,
+    chronology: ChronologyLedger,
+    openLoops: OpenLoopsLedger,
     gates: ReadonlyArray<HumanGate>,
     styleGuide: StyleGuide,
   ): ChapterPlan {
@@ -130,12 +160,20 @@ export class ChapterPlanner {
     const thematicQuestion = latestTheme
       ? `本章是否要让“${latestTheme.theme}”击败“${latestTheme.antiTheme}”？`
       : "本章的事件是否真正承担了主题表达？";
+    const activeLoop = openLoops.loops.find((loop) => loop.status !== "closed");
 
     return {
       targetChapterNumber,
-      chapterMission: buildMission(memory),
+      chapterMission: buildMission(memory, chapterSummaries, openLoops),
       readerGoal: "让读者同时获得推进感、代价感和明确的追读钩子。",
-      sceneBlueprint: buildSceneBlueprint(presentCharacters, themeHistory, styleProfile),
+      sceneBlueprint: buildSceneBlueprint(
+        presentCharacters,
+        themeHistory,
+        styleProfile,
+        chapterSummaries,
+        chronology,
+        openLoops,
+      ),
       characterIntent: presentCharacters.map((entry, index) => ({
         name: entry.name,
         desiredMovement:
@@ -151,7 +189,9 @@ export class ChapterPlanner {
       styleProfile,
       gateNote: nextGate
         ? `本章命中人工检查点：${nextGate.label}。完成后应暂停并进行人工复核。`
-        : "本章没有命中阻断式 gate，但仍需按 revision brief 自查。",
+        : activeLoop
+          ? `本章必须继续承接 open loop：“${activeLoop.description}”。`
+          : "本章没有命中阻断式 gate，但仍需按 revision brief 自查。",
     };
   }
 }

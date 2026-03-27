@@ -6,7 +6,7 @@ import type {
   ThemeReport,
 } from "../types.js";
 import { ReaderExperienceCritic } from "../modules/reader-experience-critic.js";
-import { createOpenAIClient, parseJsonObjectWithRepair, resolveOpenAIConfig } from "./openai-shared.js";
+import { createChatCompletionWithRetry, createOpenAIClient, parseJsonObjectWithRepair, resolveOpenAIConfig } from "./openai-shared.js";
 
 export interface ReaderCriticInput {
   readonly chapterNumber: number;
@@ -153,7 +153,7 @@ export class OpenAIReaderCriticEngine implements ReaderCriticEngine {
 
   async review(input: ReaderCriticInput): Promise<ReaderExperienceReport> {
     const fallback = await this.heuristic.review(input);
-    const response = await this.client.chat.completions.create({
+    const response = await createChatCompletionWithRetry(this.client, {
       model: this.model,
       temperature: 0.2,
       response_format: { type: "json_object" },
@@ -167,6 +167,9 @@ export class OpenAIReaderCriticEngine implements ReaderCriticEngine {
           content: buildReaderPrompt(input),
         },
       ],
+    }, {
+      label: "reader",
+      maxAttempts: 3,
     });
 
     const raw = response.choices[0]?.message?.content ?? "";

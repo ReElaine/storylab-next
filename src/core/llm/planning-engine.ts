@@ -1,19 +1,25 @@
 import type {
   ChapterPlan,
+  ChapterSummaryRecord,
   CharacterHistory,
+  ChronologyLedger,
   HumanGate,
+  OpenLoopsLedger,
   StoryMemory,
   StyleGuide,
   ThemeHistory,
 } from "../types.js";
 import { ChapterPlanner } from "../modules/chapter-planner.js";
-import { createOpenAIClient, extractJsonObject, resolveOpenAIConfig } from "./openai-shared.js";
+import { createChatCompletionWithRetry, createOpenAIClient, extractJsonObject, resolveOpenAIConfig } from "./openai-shared.js";
 
 export interface PlanningInput {
   readonly targetChapterNumber: number;
   readonly characterHistory: ReadonlyArray<CharacterHistory>;
   readonly themeHistory: ThemeHistory;
   readonly memory: StoryMemory;
+  readonly chapterSummaries: ReadonlyArray<ChapterSummaryRecord>;
+  readonly chronology: ChronologyLedger;
+  readonly openLoops: OpenLoopsLedger;
   readonly gates: ReadonlyArray<HumanGate>;
   readonly styleGuide: StyleGuide;
 }
@@ -33,6 +39,9 @@ export class HeuristicPlanningEngine implements PlanningEngine {
       input.characterHistory,
       input.themeHistory,
       input.memory,
+      input.chapterSummaries,
+      input.chronology,
+      input.openLoops,
       input.gates,
       input.styleGuide,
     );
@@ -52,7 +61,7 @@ export class OpenAIPlanningEngine implements PlanningEngine {
 
   async plan(input: PlanningInput): Promise<ChapterPlan> {
     const fallback = await this.heuristic.plan(input);
-    const response = await this.client.chat.completions.create({
+    const response = await createChatCompletionWithRetry(this.client, {
       model: this.model,
       temperature: 0.5,
       response_format: { type: "json_object" },
@@ -75,6 +84,15 @@ export class OpenAIPlanningEngine implements PlanningEngine {
             "story memory：",
             JSON.stringify(input.memory, null, 2),
             "",
+            "recent chapter summaries：",
+            JSON.stringify(input.chapterSummaries, null, 2),
+            "",
+            "chronology：",
+            JSON.stringify(input.chronology, null, 2),
+            "",
+            "open loops：",
+            JSON.stringify(input.openLoops, null, 2),
+            "",
             "human gates：",
             JSON.stringify(input.gates, null, 2),
             "",
@@ -86,6 +104,9 @@ export class OpenAIPlanningEngine implements PlanningEngine {
           ].join("\n"),
         },
       ],
+    }, {
+      label: "planner",
+      maxAttempts: 3,
     });
 
     const raw = response.choices[0]?.message?.content ?? "";

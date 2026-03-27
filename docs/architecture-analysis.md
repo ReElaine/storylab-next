@@ -9,6 +9,7 @@
 - writer / analysis / reader / revise 解耦
 - 审计与修订闭环
 - 自动循环修订与最终正文导出
+- 串行进度输出、retry 与可观测性
 
 当前重点不是“一键出成品”，而是把真正影响正文质量的中间层做硬：
 
@@ -81,6 +82,7 @@ storylab-next/
 - 编排 `run / plan-next / write-from-plan / writer-cycle / revise-cycle / revise-until-pass`
 - 统一调度 engine、store、modules
 - 组织 analysis、writer、reader、revise、comparison、persist 顺序
+- 在自动循环中维持串行步骤、进度输出与停止条件判断
 
 ### Store 层
 
@@ -104,6 +106,7 @@ storylab-next/
 - 对外提供可切换引擎接口
 - 当前支持 `heuristic / openai`
 - 让 analysis / planning / writer / reader / revise 可以按环节切换
+- 对 OpenAI 兼容链路统一施加 timeout / retry / JSON 修复
 
 ## 5. 状态目录设计
 
@@ -156,6 +159,16 @@ books/<bookId>/final/
 
 `writer working -> before analysis -> reader -> scene audit -> scene-level revise -> re-analysis -> re-reader -> comparison -> persist`
 
+### `revise-until-pass`
+
+`writer working -> analysis -> reader -> scene audit -> gate -> revise? -> re-analysis -> re-reader -> post-gate -> final?`
+
+其中：
+
+- 工作流按串行执行，不并行触发多个 LLM agent
+- CLI 会输出阶段进度、reader 分数与建议、scene audit 问题和 retry 日志
+- 如果 reader 已过线且不存在硬结构阻断，系统会直接通过，不再继续 revise
+
 ## 7. 已落地的关键能力
 
 已经落地的核心能力包括：
@@ -178,6 +191,7 @@ books/<bookId>/final/
 - scene-level rewrite 已可追踪、可验证
 - comparison 已开始区分事实层与解释层
 - LLM 接入已打通，但不会破坏 deterministic 证据链
+- reader 优先 gate 已落地，能避免把已达标文本继续修坏
 
 ## 9. 当前边界
 
@@ -186,6 +200,7 @@ books/<bookId>/final/
 - 默认仍以 heuristic 为主，不是默认全链路 LLM
 - LLM prompt / schema 仍是第一版
 - rewrite effectiveness 还在继续强化
+- 串行全 LLM 链路仍偏慢，writer 与 analysis 是主要耗时项
 - human gate 还没有形成完整协作工作流
 - style local rewrite 还可以继续做细
 - 更成熟的收益判断和 regression detection 仍未完成

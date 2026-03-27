@@ -1,6 +1,17 @@
 import { resolve } from "node:path";
-import { StorylabRunner } from "../core/pipeline/storylab-runner.js";
+import { StorylabRunner, type StorylabProgressEvent } from "../core/pipeline/storylab-runner.js";
 import { createDemoWorkspace } from "../core/project/demo.js";
+
+function formatTimestamp(date = new Date()): string {
+  return `${date.toLocaleDateString("zh-CN", { hour12: false })} ${date.toLocaleTimeString("zh-CN", { hour12: false })}`;
+}
+
+function createCliProgressReporter(): (event: StorylabProgressEvent) => void {
+  return (event) => {
+    const iteration = event.iteration ? `#${event.iteration} ` : "";
+    process.stderr.write(`[storylab][${formatTimestamp()}][${event.stage}] ${iteration}${event.detail}\n`);
+  };
+}
 
 function printUsage(): void {
   process.stdout.write(
@@ -52,7 +63,7 @@ export async function main(args: string[]): Promise<void> {
       throw new Error(`Invalid chapter number: ${chapterNumberRaw}`);
     }
 
-    const runner = new StorylabRunner(resolve(workspaceDir));
+    const runner = new StorylabRunner(resolve(workspaceDir), { progressReporter: createCliProgressReporter() });
     const result = await runner.run(bookId, chapterNumber);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
@@ -71,7 +82,7 @@ export async function main(args: string[]): Promise<void> {
       throw new Error(`Invalid chapter number: ${chapterNumberRaw}`);
     }
 
-    const runner = new StorylabRunner(resolve(workspaceDir));
+    const runner = new StorylabRunner(resolve(workspaceDir), { progressReporter: createCliProgressReporter() });
     const result = await runner.planNext(bookId, targetChapterNumber);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
@@ -90,7 +101,7 @@ export async function main(args: string[]): Promise<void> {
       throw new Error(`Invalid chapter number: ${chapterNumberRaw}`);
     }
 
-    const runner = new StorylabRunner(resolve(workspaceDir));
+    const runner = new StorylabRunner(resolve(workspaceDir), { progressReporter: createCliProgressReporter() });
     const result = await runner.writeFromPlan(bookId, targetChapterNumber);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
@@ -109,7 +120,7 @@ export async function main(args: string[]): Promise<void> {
       throw new Error(`Invalid chapter number: ${chapterNumberRaw}`);
     }
 
-    const runner = new StorylabRunner(resolve(workspaceDir));
+    const runner = new StorylabRunner(resolve(workspaceDir), { progressReporter: createCliProgressReporter() });
     const result = await runner.writerCycle(bookId, targetChapterNumber, flags.includes("--override"));
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
@@ -128,7 +139,7 @@ export async function main(args: string[]): Promise<void> {
       throw new Error(`Invalid chapter number: ${chapterNumberRaw}`);
     }
 
-    const runner = new StorylabRunner(resolve(workspaceDir));
+    const runner = new StorylabRunner(resolve(workspaceDir), { progressReporter: createCliProgressReporter() });
     const result = await runner.reviseCycle(bookId, targetChapterNumber, flags.includes("--override"));
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
@@ -152,7 +163,7 @@ export async function main(args: string[]): Promise<void> {
       ? Number.parseInt(flags[maxIndex + 1] ?? "3", 10)
       : 3;
 
-    const runner = new StorylabRunner(resolve(workspaceDir));
+    const runner = new StorylabRunner(resolve(workspaceDir), { progressReporter: createCliProgressReporter() });
     const result = await runner.reviseUntilPass(bookId, targetChapterNumber, {
       override: flags.includes("--override"),
       maxIterations: Number.isNaN(maxIterations) ? 3 : maxIterations,

@@ -7,7 +7,7 @@ import type {
   ThemeHistory,
 } from "../types.js";
 import { DraftGenerator } from "../modules/draft-generator.js";
-import { createOpenAIClient, resolveOpenAIConfig } from "./openai-shared.js";
+import { createChatCompletionWithRetry, createOpenAIClient, resolveOpenAIConfig } from "./openai-shared.js";
 
 export interface WriterGenerationInput {
   readonly plan: ChapterPlan;
@@ -180,7 +180,7 @@ export class OpenAIWriterAgent implements WriterAgent {
   }
 
   async generate(input: WriterGenerationInput): Promise<ChapterDraft> {
-    const response = await this.client.chat.completions.create({
+    const response = await createChatCompletionWithRetry(this.client, {
       model: this.model,
       temperature: 0.85,
       messages: [
@@ -197,6 +197,9 @@ export class OpenAIWriterAgent implements WriterAgent {
           content: buildWriterPrompt(input),
         },
       ],
+    }, {
+      label: "writer",
+      maxAttempts: 3,
     });
 
     const raw = response.choices[0]?.message?.content ?? "";
