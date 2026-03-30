@@ -126,6 +126,7 @@ test("settlement agent produces summary, state delta, chronology, and open loops
   assert.equal(result.chapterStateDelta.chapterNumber, 1);
   assert.equal(result.chronology.events.length, 1);
   assert.ok(result.openLoops.loops.length >= 1);
+  assert.ok(result.relationships.entries.some((entry) => entry.relationshipId.includes("林凡") || entry.characters.includes("林凡")));
   assert.ok(result.chapterSummary.openedLoopIds.length >= 1);
   assert.ok(result.chapterStateDelta.updatedLoops.some((loop) => loop.action === "opened"));
   assert.match(result.chronology.events[0].summary, /忍耐|资源|反抗|夺回|灵石|规则/u);
@@ -302,4 +303,146 @@ test("settlement agent prefers markerless prose paragraphs over noisy analysis e
   assert.ok(result.chronology.events.some((event) => /停发三月配给|深井/u.test(event.consequence) || /停发三月配给|深井/u.test(event.summary)));
   assert.ok(result.openLoops.loops.some((loop) => /深井|停发三月配给/u.test(loop.description)));
   assert.doesNotMatch(result.chapterSummary.summary, /场景结束时获得有限推进|真正推动这个场景/u);
+});
+
+test("settlement agent records reveal ledger entries when an old mystery is explicitly advanced", () => {
+  const agent = new SettlementAgent();
+  const result = agent.settle({
+    chapterNumber: 3,
+    draft: {
+      chapterNumber: 3,
+      title: "门铃声后的名字",
+      content: "林凡终于明白，母亲失踪那夜的门铃声不是巧合。原来那串门铃声是有人故意留下的暗号。",
+      summary: "工作稿",
+      basedOnPlan: 3,
+    },
+    plan: {
+      targetChapterNumber: 3,
+      chapterMission: "把旧谜题往前推进一层。",
+      readerGoal: "让读者感到真相开始露头。",
+      sceneBlueprint: [
+        {
+          sceneId: "scene-1",
+          sceneAnchor: "scene-1-门铃",
+          sceneNumber: 1,
+          pov: "林凡",
+          goal: "触碰母亲失踪之谜",
+          conflict: "记忆与线索对不上",
+          turn: "林凡终于听懂那串门铃声的意义",
+          result: "旧谜题被明确推进",
+          newInformation: ["门铃声是有人故意留下的暗号"],
+          emotionalShift: "困惑 -> 发冷",
+          drivingCharacter: "林凡",
+          opposingForce: "旧记忆",
+          decision: "继续追查门铃声",
+          cost: "更深卷进旧案",
+          relationshipChange: "与母亲失踪线重新绑定",
+          thematicTension: "真相越近代价越高",
+          valuePositionA: "停下自保",
+          valuePositionB: "继续追查",
+          sceneStance: "压向真相",
+          styleDirective: "压低说明，保留悬念",
+        },
+      ],
+      characterIntent: [],
+      themeIntent: "真相的代价",
+      thematicQuestion: "追查真相是否值得继续付代价",
+      styleProfile: {
+        narrationStyle: "直接",
+        dialogueStyle: "克制",
+        pacingProfile: "快",
+        descriptionDensity: "低",
+        toneConstraints: [],
+      },
+      gateNote: "",
+    },
+    analysis: {
+      scenes: [
+        {
+          sceneId: "scene-1",
+          sceneAnchor: "scene-1-门铃",
+          sceneNumber: 1,
+          pov: "林凡",
+          goal: "触碰母亲失踪之谜",
+          conflict: "记忆与线索对不上",
+          turn: "林凡终于听懂那串门铃声的意义",
+          result: "旧谜题被明确推进",
+          newInformation: ["门铃声是有人故意留下的暗号"],
+          emotionalShift: "困惑 -> 发冷",
+          sourceParagraphs: ["林凡终于明白，母亲失踪那夜的门铃声不是巧合。"],
+        },
+      ],
+      characterStates: [
+        {
+          name: "林凡",
+          desire: "找出母亲失踪真相",
+          fear: "真相会把自己拖进更深的危险",
+          misbelief: "只要追得够快就能扛住代价",
+          recentDecision: "继续追查门铃声",
+          decisionCost: "会更深卷进旧案",
+          relationshipShift: ["与母亲失踪线重新绑定"],
+          arcProgress: "开始主动逼近真相线",
+          presentInChapter: true,
+        },
+      ],
+      themeReport: {
+        chapterNumber: 3,
+        activeThemes: [],
+      },
+      styleReport: {
+        averageSentenceLength: 14,
+        dialogueRatio: 0.05,
+        descriptionRatio: 0.2,
+        rhythmNote: "",
+        adherenceNote: "",
+        styleDriftPoints: [],
+        dialogueHomogeneitySpots: [],
+        descriptionBalanceNote: "",
+      },
+      readerReport: {
+        chapterNumber: 3,
+        scores: {
+          hook: 8,
+          momentum: 7,
+          emotionalPeak: 7,
+          suspense: 8,
+          memorability: 7,
+        },
+        summary: "旧谜题明显往前推进了。",
+        strengths: [],
+        risks: ["真相线一旦被推进，后续必须继续承接。"],
+        revisionSuggestions: [],
+      },
+      gateDecision: {
+        chapterNumber: 3,
+        gate: null,
+        required: false,
+        rationale: "",
+      },
+      revisionBrief: "",
+    },
+    previousChronology: { events: [] },
+    previousOpenLoops: {
+      loops: [
+        {
+          loopId: "loop-ch0001-02",
+          type: "mystery",
+          introducedInChapter: 1,
+          owner: "林凡",
+          description: "母亲失踪那夜的门铃声到底意味着什么",
+          expectedPayoffWindow: "soon",
+          urgency: "high",
+          status: "open",
+          payoffConstraints: ["近几章必须持续推进谜题"],
+          relatedEntities: ["林凡", "母亲", "门铃声"],
+          evidenceRefs: ["scene-4"],
+          lastUpdatedChapter: 1,
+        },
+      ],
+    },
+  });
+
+  assert.equal(result.reveals.entries.length, 1);
+  assert.equal(result.reveals.entries[0].sourceLoopId, "loop-ch0001-02");
+  assert.match(result.reveals.entries[0].revealedTruth, /门铃声|暗号|真相/u);
 });

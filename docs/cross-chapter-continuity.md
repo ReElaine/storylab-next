@@ -9,6 +9,9 @@
 - 自动循环修订与最终正文导出
 - `character-history / theme-history / story-memory` 基础跨章状态
 - `Phase 1: Settlement Layer` 初版
+- `Phase 2: State-Driven Planning` 初版
+- `Phase 3: Continuity Audit` 初版
+- `Phase 4: Re-settlement` 初版
 
 但这还不足以真正支撑整本书的连续写作。后续架构要解决的是：
 
@@ -105,15 +108,15 @@
 
 当前主链已经大体具备：
 
-`plan -> writer -> analysis -> reader -> revise -> gate -> final prose`
+`plan -> writer -> analysis -> reader -> revise -> re-settlement -> re-audit -> gate -> final prose`
 
 #### 2. 状态结算流
 
-这是长篇连续写作真正缺失的部分，目标链路是：
+这条链现在已经进入初版可用状态，当前目标链路是：
 
 `final prose -> settlement -> continuity audit -> persist canonical state -> plan next`
 
-当 `revise` 改动正文后，还需要：
+当 `revise` 改动正文后，当前主链已经会执行：
 
 `revise -> re-settlement -> re-audit -> persist`
 
@@ -181,17 +184,17 @@
 - `theme-history`
 - `story-memory`
 
-以及 `Phase 1` 新增的：
+以及 `Phase 1` / `Phase 3` 新增的：
 
 - `chapter_summary`
 - `chapter_state_delta`
 - `chronology`
 - `open_loops`
+- `reveals ledger`
+- `relationship ledger`
 
 但还没有正式账本层：
 
-- `relationship ledger`
-- `reveals ledger`
 - `world_state`
 - `book_phase`
 - `causality ledger`
@@ -221,7 +224,7 @@
 - 按 agent 区分的上下文切片规则
 - 更细粒度的 runtime pack 裁剪与缓存策略
 
-#### 5. 状态结算流才刚起步
+#### 5. 状态结算流仍在补强
 
 当前已经开始落地：
 
@@ -229,9 +232,8 @@
 - `chapter_state_delta`
 - `chronology`
 - `open_loops`
-
-但还没有：
-
+- `reveals ledger`
+- `relationship ledger`
 - 独立 `continuity gate`
 - `re-settlement`
 - canonical book-state commit 语义
@@ -240,9 +242,9 @@
 
 如果只挑最关键的 3 个差距，可以概括成：
 
-1. 还没有完整 `settlement layer`
-2. 还没有独立 `continuity layer`
-3. 还没有“可作为下一章唯一真相源”的 canonical book-state
+1. 还没有完整的 canonical book-state
+2. 还没有更强的 world/theme/book phase 账本
+3. 还没有 scene 增量重结算
 
 换句话说：
 
@@ -262,6 +264,8 @@
 - `chapter_state_delta`
 - `chronology`
 - `open_loops`
+- `reveals ledger`
+- `relationship ledger`
 
 当前已经能在 `final prose` 之后生成：
 
@@ -269,33 +273,33 @@
 - `story/settlement/chapter-XXXX.chapter-state-delta.json`
 - `story/plot/chronology.json`
 - `story/plot/open-loops.json`
+- `story/plot/reveals-ledger.json`
+- `story/characters/relationship-ledger.json`
 
 并且：
 
 - `plan-next` 已开始读取 recent chapter summaries
 - `plan-next` 已开始读取 chronology
 - `plan-next` 已开始读取 open loops
+- `plan-next` 已开始读取 recent reveals，并把“已揭示真相”转成下一章的后果或行动压力
+- `plan-next` 已开始读取 recent relationship changes，并把“已恶化/已重划线的关系”转成下一章冲突压力
 
 ### 当前边界
 
 Phase 1 仍然只是“有账可记”的版本，还不是完整全书账本：
 
-- relationship / reveals / theme progression 暂未接入
+- theme progression 暂未接入
 - scene 增量结算还未开始
-- continuity gate 还未建立
-- revise 后的 re-settlement 还未建立
+- 更高阶的 continuity 语义推理还未建立
+- 更细粒度的 revise 后增量重结算还未建立
 
 ## 推荐总链路
 
-短期目标链路：
+当前主链：
 
-`plan -> writer -> analysis -> reader -> revise -> gate -> final prose -> settlement -> plan next`
+`plan -> writer -> analysis -> reader -> revise -> re-settlement -> re-audit -> gate -> persist canonical state -> final prose -> plan next`
 
-完整目标链路：
-
-`plan -> writer -> analysis -> reader -> revise -> gate -> final prose -> settlement -> continuity audit -> persist canonical state -> plan next`
-
-当 revise 能重结算后，目标闭环是：
+其中 `revise-cycle / revise-until-pass` 已经默认采用：
 
 `writer -> revise -> re-settlement -> re-audit -> persist`
 
@@ -330,6 +334,8 @@ Phase 1 仍然只是“有账可记”的版本，还不是完整全书账本：
 - recent chapter summaries
 - chronology
 - open loops
+- recent reveals
+- recent relationship changes
 - core character current state
 - current book phase（初版可先 heuristic）
 
@@ -339,45 +345,56 @@ Phase 1 仍然只是“有账可记”的版本，还不是完整全书账本：
 - 更明确的 `carry-forward facts / forbidden contradictions`
 - 面向不同 agent 的专用 context slice
 
-#### 3. 规划 Phase 3：Continuity Audit
+#### 3. 完成 Phase 3：Continuity Audit
 
-先不做太复杂，首批只查：
+当前初版已落地，首批检查范围包括：
 
-- 时间线冲突
-- world rules 冲突
-- 人物状态 / 人设冲突
-- open loop / reveal 冲突
+- scene coverage
+- timeline
+- world rules
+- open loop continuity / contradiction / duplicate loop
+- reveal continuity / reveal conflict
+- character state continuity / drift
+- relationship drift
 
 当前已经落地的最小版：
 
 - `ContinuityAgent`
 - `story/continuity/chapter-XXXX.continuity-report.json`
 - `finalizeAcceptedChapter` 现在会先 `settlement -> continuity audit`
-- continuity fail 时只写 `continuity_report`，不会继续写 canonical `summary / delta / chronology / open-loops`
+- continuity fail 时只写 `continuity_report`，不会继续写 canonical `summary / delta / chronology / open-loops / reveals-ledger / relationship-ledger`
 - `final prose` 也会因为 continuity fail 被拦下，不会导出到 `final/*.txt`
 
 当前这版仍然是最小实现，主要作用是先把 continuity gate 建起来，而不是一次性做完整世界规则检查：
 
-- 已接入：scene coverage、timeline、open loop continuity、reveal continuity、已跟踪角色状态连续性、character state drift、open loop contradiction / duplicate loop、最小版 `world-rules.json` 禁用表达 / 必要规则信号检查
+- 已接入：scene coverage、timeline、open loop continuity、reveal continuity、reveals ledger 冲突检查
+- 已接入：已跟踪角色状态连续性、character state drift、relationship drift
+- 已接入：open loop contradiction / duplicate loop、最小版 `world-rules.json` 禁用表达 / 必要规则信号检查
 - 暂时未做：更强的 `world_rules` 语义推理与例外规则解释
 
 ### P1：紧接着做
 
 #### 4. 推进 Phase 4：Re-settlement
 
-初版先用“整章重结算”：
+当前已经进入初版实现：
 
-- revise 后重新生成 summary / delta / continuity report
-- persist 只认最后一次 revise 后的状态
+- 每一轮 `revise` 后都会重新生成 `settlement`
+- 每一轮 `revise` 后都会重新生成 `continuity report`
+- `revise-cycle / revise-until-pass` 的最终判定，已经基于改后 `continuity` 结果
+- `persist` 只认最后一次 revise 后的状态
+
+当前仍待继续做强：
+
+- scene 增量重结算
+- 更细粒度的 canonical delta merge
+- 更清晰的 re-settlement / re-audit 调试视图
 
 #### 5. 补更完整的全书账本
 
 优先顺序建议：
 
-1. relationship ledger
-2. reveals ledger
-3. theme progression
-4. world state / book phase
+1. theme progression
+2. world state / book phase
 
 ### P2：高级优化
 

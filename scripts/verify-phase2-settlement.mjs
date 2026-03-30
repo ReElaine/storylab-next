@@ -51,6 +51,7 @@ const settlement = settlementAgent.settle({
   analysis,
   previousChronology: { events: [] },
   previousOpenLoops: { loops: [] },
+  previousRelationships: { entries: [] },
 });
 
 await store.writeOutput(
@@ -77,11 +78,25 @@ await store.writeOutput(
   "open-loops.json",
   JSON.stringify(settlement.openLoops, null, 2),
 );
+await store.writeOutput(
+  bookId,
+  "plot",
+  "reveals-ledger.json",
+  JSON.stringify(settlement.reveals, null, 2),
+);
+await store.writeOutput(
+  bookId,
+  "characters",
+  "relationship-ledger.json",
+  JSON.stringify(settlement.relationships, null, 2),
+);
 
 console.log(JSON.stringify({
   chapterSummaryTitle: settlement.chapterSummary.title,
   chronologyEvents: settlement.chronology.events.length,
   openLoops: settlement.openLoops.loops.length,
+  relationships: settlement.relationships.entries.length,
+  reveals: settlement.reveals.entries.length,
   openedLoopIds: settlement.chapterSummary.openedLoopIds,
   advancedLoopIds: settlement.chapterSummary.advancedLoopIds,
 }, null, 2));

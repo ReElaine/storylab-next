@@ -88,6 +88,38 @@ test("chapter planner uses open loops and chapter summaries to build the next mi
         },
       ],
     },
+    {
+      entries: [
+        {
+          revealId: "reveal-ch0001-01",
+          chapterNumber: 1,
+          sceneNumber: 3,
+          sceneId: "scene-3",
+          sourceLoopId: "loop-ch0001-01",
+          category: "promise",
+          subject: "赵执事的打压方式",
+          revealedTruth: "赵执事会先用断供把林凡逼进更危险的差事",
+          revealStrength: "partial",
+          knownByReader: true,
+          knownByCharacters: ["林凡"],
+          evidenceRefs: ["scene-3"],
+        },
+      ],
+    },
+    {
+      entries: [
+        {
+          relationshipId: "linfan::zhao",
+          characters: ["林凡", "赵执事"],
+          status: "林凡与赵执事从顺从转公开对立",
+          polarity: "hostile",
+          tension: "high",
+          lastChange: "林凡与赵执事从顺从转公开对立",
+          lastUpdatedChapter: 1,
+          evidenceRefs: ["scene-3"],
+        },
+      ],
+    },
     [],
     {
       narrativeVoice: "直接",
@@ -98,7 +130,9 @@ test("chapter planner uses open loops and chapter summaries to build the next mi
     },
   );
 
-  assert.ok(plan.chapterMission.includes("赵执事记恨林凡"));
-  assert.ok(plan.sceneBlueprint[0].goal.includes("赵执事记恨林凡"));
-  assert.ok(plan.gateNote.includes("open loop"));
+  assert.ok(plan.chapterMission.includes("赵执事的打压方式"));
+  assert.ok(plan.chapterMission.includes("断供"));
+  assert.ok(plan.sceneBlueprint[0].goal.includes("真相已明确"));
+  assert.ok(plan.gateNote.includes("最近揭示"));
+  assert.ok(plan.sceneBlueprint[0].relationshipChange.includes("公开对立"));
 });

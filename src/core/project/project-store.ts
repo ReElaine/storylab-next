@@ -11,6 +11,8 @@ import type {
   ContextPack,
   HumanGate,
   OpenLoopsLedger,
+  RelationshipLedger,
+  RevealsLedger,
   StoryMemory,
   StyleGuide,
   ThemeHistory,
@@ -198,6 +200,18 @@ export class ProjectStore {
   async loadOpenLoops(bookId: string): Promise<OpenLoopsLedger> {
     return this.readJsonOrDefault(join(this.storyDir(bookId), "plot", "open-loops.json"), {
       loops: [],
+    });
+  }
+
+  async loadReveals(bookId: string): Promise<RevealsLedger> {
+    return this.readJsonOrDefault(join(this.storyDir(bookId), "plot", "reveals-ledger.json"), {
+      entries: [],
+    });
+  }
+
+  async loadRelationships(bookId: string): Promise<RelationshipLedger> {
+    return this.readJsonOrDefault(join(this.storyDir(bookId), "characters", "relationship-ledger.json"), {
+      entries: [],
     });
   }
 

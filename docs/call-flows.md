@@ -48,6 +48,8 @@ node dist/index.js plan-next <workspaceDir> <bookId> <targetChapterNumber>
 - `story/settlement/*.chapter-summary.json`
 - `story/plot/chronology.json`
 - `story/plot/open-loops.json`
+- `story/plot/reveals-ledger.json`
+- `story/characters/relationship-ledger.json`
 - `style-guide.json`
 - `gates.json`
 
@@ -60,6 +62,16 @@ node dist/index.js plan-next <workspaceDir> <bookId> <targetChapterNumber>
 
 - `story/context/chapter-XXXX.context-pack.json`
 - `story/planning/chapter-XXXX.chapter-plan.json`
+
+`context-pack.json` 当前会携带：
+
+- recent chapter summaries
+- chronology slice
+- active open loops
+- recent reveals
+- recent relationship changes
+- relevant character states
+- current book phase
 
 ## 3. `write-from-plan`
 
@@ -123,8 +135,8 @@ node dist/index.js revise-cycle <workspaceDir> <bookId> <targetChapterNumber> [-
 7. `re-reader`
 8. `comparison`
 9. `postRevisionGate`
-10. `settlement`
-11. `continuity audit`
+10. `re-settlement`
+11. `re-audit`
 12. `persist canonical state`
 13. `final prose export`
 
@@ -144,6 +156,8 @@ node dist/index.js revise-cycle <workspaceDir> <bookId> <targetChapterNumber> [-
   - 写 canonical `chapter-state-delta`
   - 更新 `chronology`
   - 更新 `open-loops`
+  - 更新 `reveals-ledger`
+  - 更新 `relationship-ledger`
   - 导出 `final/*.txt`
 
 ## 6. `revise-until-pass`
@@ -162,14 +176,15 @@ node dist/index.js revise-until-pass <workspaceDir> <bookId> <targetChapterNumbe
 6. `re-analysis`
 7. `re-reader`
 8. `comparison`
-9. `settlement`
-10. `continuity audit`
+9. `re-settlement`
+10. `re-audit`
 
 说明：
 
 - 整条链按串行执行，不并行调用多个 LLM agent
 - CLI 会输出阶段进度、reader 分数、修改建议、scene audit 问题和 retry 日志
 - 如果当前版本已经通过 gate，会直接停止，不进入 revise
+- 每一轮 revise 之后，canonical 判定都基于“改后 settlement + 改后 continuity report”
 
 停止条件：
 
@@ -196,3 +211,5 @@ reader 优先规则：
 - `books/<bookId>/story/settlement/chapter-XXXX.chapter-state-delta.json`
 - `books/<bookId>/story/plot/chronology.json`
 - `books/<bookId>/story/plot/open-loops.json`
+- `books/<bookId>/story/plot/reveals-ledger.json`
+- `books/<bookId>/story/characters/relationship-ledger.json`

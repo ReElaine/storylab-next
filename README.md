@@ -1,6 +1,6 @@
 # storylab-next
 
-`storylab-next` 是一个独立的中文小说写作系统原型，重点不是堆模块，而是把“规划 -> writer -> analysis -> reader -> revise -> gate -> final prose”这条主链做实。
+`storylab-next` 是一个独立的中文小说写作系统原型，重点不是堆模块，而是把“规划 -> writer -> analysis -> reader -> revise -> re-settlement -> re-audit -> gate -> final prose”这条主链做实。
 
 当前项目已经具备：
 
@@ -10,10 +10,11 @@
 - 自动循环修订，直到过线或停止
 - 只有全部关键环节通过后，才导出最终正文 `.txt`
 - 串行 LLM 工作流、阶段进度输出与统一 retry 机制
-- Phase 1 Settlement Layer 初版：在最终提交链中生成 summary / state delta / chronology / open loops
+- Phase 1 Settlement Layer 初版：在最终提交链中生成 summary / state delta / chronology / open loops / reveals / relationship ledger
 - Phase 2 State-Driven Planning 初版：`plan-next` 会先组装 `context-pack`，再基于账本状态规划下一章
 - Phase 3 Continuity Audit 初版：`continuity agent` 已接入最终提交链，continuity fail 时阻止 canonical persist
   - 当前最小检查项包括：scene coverage、timeline、open loop continuity、reveal continuity、tracked character state continuity、character state drift、open loop contradiction / duplicate loop、可选 `world-rules.json` 规则检查
+- Phase 4 Re-settlement 初版：每一轮 revise 之后都会重新执行 settlement 与 continuity audit，canonical persist 只认改后账本
 
 当前中短期关注的是“单章质量闭环”，但项目已经正式记录了下一条升级路线：
 
@@ -105,11 +106,13 @@ STORYLAB_OPENAI_BASE_URL=https://your-compatible-endpoint/v1
   - `books/<bookId>/story/settlement/chapter-XXXX.chapter-state-delta.json`
   - `books/<bookId>/story/plot/chronology.json`
   - `books/<bookId>/story/plot/open-loops.json`
+  - `books/<bookId>/story/plot/reveals-ledger.json`
+  - `books/<bookId>/story/characters/relationship-ledger.json`
 
 - state-driven planning 上下文
   - 在 `plan-next` 时先生成
   - `books/<bookId>/story/context/chapter-XXXX.context-pack.json`
-  - 供 planner / writer 读取 recent summaries、chronology、open loops、角色当前状态与当前书稿阶段
+  - 供 planner / writer 读取 recent summaries、chronology、open loops、recent reveals、recent relationship changes、角色当前状态与当前书稿阶段
 
 如果修订后仍未过线，则：
 
@@ -138,7 +141,7 @@ STORYLAB_OPENAI_BASE_URL=https://your-compatible-endpoint/v1
 
 当前 `writer-cycle / revise-cycle / revise-until-pass` 都是串行执行：
 
-`writer -> analysis -> reader -> scene audit -> revise -> re-analysis -> re-reader -> gate`
+`writer -> analysis -> reader -> scene audit -> revise -> re-analysis -> re-reader -> re-settlement -> re-audit -> gate`
 
 CLI 会把阶段进度、reader 分数、修改建议、scene audit 问题、target scene 与 retry 日志输出到 `stderr`，而最终 JSON 结果继续输出到 `stdout`。
 

@@ -230,6 +230,40 @@ export interface OpenLoopsLedger {
   readonly loops: ReadonlyArray<OpenLoopEntry>;
 }
 
+export interface RevealEntry {
+  readonly revealId: string;
+  readonly chapterNumber: number;
+  readonly sceneNumber: number | null;
+  readonly sceneId?: string;
+  readonly sourceLoopId: string | null;
+  readonly category: "mystery" | "question" | "promise";
+  readonly subject: string;
+  readonly revealedTruth: string;
+  readonly revealStrength: "hinted" | "partial" | "explicit";
+  readonly knownByReader: boolean;
+  readonly knownByCharacters: ReadonlyArray<string>;
+  readonly evidenceRefs: ReadonlyArray<string>;
+}
+
+export interface RevealsLedger {
+  readonly entries: ReadonlyArray<RevealEntry>;
+}
+
+export interface RelationshipLedgerEntry {
+  readonly relationshipId: string;
+  readonly characters: readonly [string, string];
+  readonly status: string;
+  readonly polarity: "allied" | "hostile" | "strained" | "neutral";
+  readonly tension: "low" | "medium" | "high";
+  readonly lastChange: string;
+  readonly lastUpdatedChapter: number;
+  readonly evidenceRefs: ReadonlyArray<string>;
+}
+
+export interface RelationshipLedger {
+  readonly entries: ReadonlyArray<RelationshipLedgerEntry>;
+}
+
 export interface ChapterStateDelta {
   readonly chapterNumber: number;
   readonly title: string;
@@ -255,6 +289,8 @@ export interface SettlementBundle {
   readonly chapterStateDelta: ChapterStateDelta;
   readonly chronology: ChronologyLedger;
   readonly openLoops: OpenLoopsLedger;
+  readonly reveals: RevealsLedger;
+  readonly relationships: RelationshipLedger;
 }
 
 export interface SettlementOutputPaths {
@@ -262,6 +298,8 @@ export interface SettlementOutputPaths {
   readonly stateDeltaPath: string;
   readonly chronologyPath: string;
   readonly openLoopsPath: string;
+  readonly revealsPath: string;
+  readonly relationshipsPath: string;
 }
 
 export interface ContinuityIssue {
@@ -269,6 +307,7 @@ export interface ContinuityIssue {
     | "timeline_conflict"
     | "scene_coverage_conflict"
     | "character_state_conflict"
+    | "relationship_conflict"
     | "open_loop_conflict"
     | "reveal_conflict"
     | "world_rule_conflict"
@@ -289,6 +328,8 @@ export interface ContinuityReport {
   readonly checkedCounts: {
     readonly previousChronologyEvents: number;
     readonly previousOpenLoops: number;
+    readonly previousReveals: number;
+    readonly previousRelationships: number;
     readonly trackedCharacters: number;
     readonly chronologyInsertions: number;
     readonly worldRules: number;
@@ -348,6 +389,8 @@ export interface ContextPack {
   readonly currentBookPhase: BookPhaseState;
   readonly recentChapterSummaries: ReadonlyArray<ChapterSummaryRecord>;
   readonly activeOpenLoops: ReadonlyArray<OpenLoopEntry>;
+  readonly recentReveals: ReadonlyArray<RevealEntry>;
+  readonly recentRelationshipChanges: ReadonlyArray<RelationshipLedgerEntry>;
   readonly chronologySlice: ReadonlyArray<ChronologyEvent>;
   readonly relevantCharacterStates: ReadonlyArray<{
     readonly name: string;
@@ -618,6 +661,10 @@ export interface StorylabRevisionCycleResult {
     readonly afterScores: ReaderExperienceReport["scores"];
     readonly beforeSummary: string;
     readonly afterSummary: string;
+    readonly beforeContinuitySummary: string;
+    readonly afterContinuitySummary: string;
+    readonly beforeContinuityIssueCount: number;
+    readonly afterContinuityIssueCount: number;
     readonly beforeSuggestions: ReadonlyArray<string>;
     readonly afterSuggestions: ReadonlyArray<string>;
     readonly beforeSceneAuditIssues: ReadonlyArray<SceneAuditIssue>;
@@ -633,6 +680,12 @@ export interface StorylabRevisionLoopIteration {
   readonly afterScores: ReaderExperienceReport["scores"];
   readonly beforeSummary: string;
   readonly afterSummary: string;
+  readonly beforeContinuityBlocking: boolean;
+  readonly afterContinuityBlocking: boolean;
+  readonly beforeContinuitySummary: string;
+  readonly afterContinuitySummary: string;
+  readonly beforeContinuityIssueCount: number;
+  readonly afterContinuityIssueCount: number;
   readonly blockingGate: BlockingGateStatus;
   readonly postRevisionGate: BlockingGateStatus;
   readonly targetSceneNumbers: ReadonlyArray<number>;

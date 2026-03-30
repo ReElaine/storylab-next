@@ -8,6 +8,8 @@ import type {
   ChronologyLedger,
   OpenLoopEntry,
   OpenLoopsLedger,
+  RelationshipLedger,
+  RevealsLedger,
   SettlementBundle,
   WorldRulesConfig,
 } from "../types.js";
@@ -20,6 +22,8 @@ interface ContinuityInput {
   readonly settlement: SettlementBundle;
   readonly previousChronology: ChronologyLedger;
   readonly previousOpenLoops: OpenLoopsLedger;
+  readonly previousRelationships?: RelationshipLedger;
+  readonly previousReveals?: RevealsLedger;
   readonly previousCharacterHistory: ReadonlyArray<CharacterHistory>;
   readonly worldRules: WorldRulesConfig;
 }
@@ -31,6 +35,7 @@ const REVEAL_SIGNAL = /真相|秘密|原来|其实|终于知道|终于明白|揭
 const STATE_TRANSITION_SIGNAL = /开始|终于|第一次|不再|转而|转向|意识到|明白|改口|松动|升级|推进/u;
 const HARD_BLOCKING_CODES = new Set<ContinuityIssue["code"]>([
   "character_state_conflict",
+  "relationship_conflict",
   "open_loop_conflict",
   "reveal_conflict",
 ]);
@@ -342,6 +347,53 @@ function detectCharacterIssues(input: ContinuityInput): ReadonlyArray<Continuity
   return issues;
 }
 
+function detectRelationshipIssues(input: ContinuityInput): ReadonlyArray<ContinuityIssue> {
+  const issues: ContinuityIssue[] = [];
+  const chapterSignals = buildChapterSignals(input);
+  const previousEntries = input.previousRelationships?.entries ?? [];
+  const currentEntries = new Map(
+    (input.settlement.relationships?.entries ?? [])
+      .filter((entry) => entry.lastUpdatedChapter === input.chapterNumber)
+      .map((entry) => [entry.relationshipId, entry] as const),
+  );
+
+  for (const previous of previousEntries) {
+    const current = currentEntries.get(previous.relationshipId);
+    if (!current) {
+      continue;
+    }
+
+    if (previous.polarity === current.polarity) {
+      continue;
+    }
+    if (previous.polarity === "neutral" || current.polarity === "neutral") {
+      continue;
+    }
+
+    const bothCharactersMentioned = previous.characters.every((name) => chapterSignals.includes(name));
+    if (!bothCharactersMentioned) {
+      continue;
+    }
+
+    const transitionSignals = [current.lastChange, current.status, chapterSignals].some((text) => STATE_TRANSITION_SIGNAL.test(text));
+    const severity: ContinuityIssue["severity"] = transitionSignals ? "medium" : "high";
+
+    issues.push(
+      createIssue({
+        code: "relationship_conflict",
+        severity,
+        scope: "state",
+        sceneNumber: null,
+        refs: [previous.relationshipId, ...current.evidenceRefs],
+        message: `关系「${previous.characters.join(" / ")}」从“${previous.lastChange}”突然跳到“${current.lastChange}”，缺少足够过渡。`,
+        recommendation: "在正文里补出关系变化的桥接事件，或把当前关系状态收回到与上一章更连续的版本。",
+      }),
+    );
+  }
+
+  return issues;
+}
+
 function scoreLoopCoverage(loop: OpenLoopEntry, chapterSignals: string): number {
   let score = 0;
   for (const keyword of extractKeywords(loop.description)) {
@@ -478,6 +530,12 @@ function detectRevealIssues(input: ContinuityInput): ReadonlyArray<ContinuityIss
   const issues: ContinuityIssue[] = [];
   const chapterSignals = buildChapterSignals(input);
   const touchedLoopIds = new Set(input.settlement.chapterStateDelta.updatedLoops.map((loop) => loop.loopId));
+  const currentRevealLoopIds = new Set(
+    (input.settlement.reveals?.entries ?? [])
+      .map((entry) => entry.sourceLoopId)
+      .filter((value): value is string => typeof value === "string" && value.length > 0),
+  );
+  const previousRevealEntries = input.previousReveals?.entries ?? [];
 
   for (const loop of input.previousOpenLoops.loops) {
     if (loop.status === "closed") {
@@ -500,7 +558,7 @@ function detectRevealIssues(input: ContinuityInput): ReadonlyArray<ContinuityIss
       continue;
     }
 
-    if (touchedLoopIds.has(loop.loopId)) {
+    if (touchedLoopIds.has(loop.loopId) || currentRevealLoopIds.has(loop.loopId)) {
       continue;
     }
 
@@ -513,6 +571,38 @@ function detectRevealIssues(input: ContinuityInput): ReadonlyArray<ContinuityIss
         refs: [loop.loopId, ...loop.evidenceRefs],
         message: `章节看起来已经触及旧谜题/承诺「${loop.description}」，但 settlement 没有把这条线记成 advanced 或 closed。`,
         recommendation: "如果本章真的推进或揭示了这条线，请在 settlement 中更新 loop 状态；如果没有，请弱化正文里的揭示口吻。",
+      }),
+    );
+  }
+
+  for (const entry of input.settlement.reveals?.entries ?? []) {
+    if (!entry.sourceLoopId) {
+      continue;
+    }
+
+    const previousEntries = previousRevealEntries.filter((previous) => previous.sourceLoopId === entry.sourceLoopId);
+    if (previousEntries.length === 0) {
+      continue;
+    }
+
+    const conflictingPrevious = previousEntries.find((previous) => (
+      keywordOverlap(previous.revealedTruth, entry.revealedTruth) === 0
+      && keywordOverlap(previous.subject, entry.subject) > 0
+    ));
+
+    if (!conflictingPrevious) {
+      continue;
+    }
+
+    issues.push(
+      createIssue({
+        code: "reveal_conflict",
+        severity: entry.revealStrength === "explicit" || conflictingPrevious.revealStrength === "explicit" ? "high" : "medium",
+        scope: "state",
+        sceneNumber: entry.sceneNumber,
+        refs: [entry.revealId, conflictingPrevious.revealId, entry.sourceLoopId],
+        message: `同一条旧谜题/承诺「${entry.subject}」在不同章节里对应了不一致的揭示内容。`,
+        recommendation: "确认哪个版本才是 canonical 真相；如本章只是补充信息，请把揭示语句改成兼容旧结论的表达。",
       }),
     );
   }
@@ -576,6 +666,7 @@ export class ContinuityAgent {
       ...detectTimelineIssues(input),
       ...detectSceneCoverageIssues(input),
       ...detectCharacterIssues(input),
+      ...detectRelationshipIssues(input),
       ...detectOpenLoopIssues(input),
       ...detectRevealIssues(input),
       ...detectWorldRuleIssues(input),
@@ -604,6 +695,8 @@ export class ContinuityAgent {
       checkedCounts: {
         previousChronologyEvents: input.previousChronology.events.length,
         previousOpenLoops: input.previousOpenLoops.loops.length,
+        previousReveals: input.previousReveals?.entries.length ?? 0,
+        previousRelationships: input.previousRelationships?.entries.length ?? 0,
         trackedCharacters: input.previousCharacterHistory.length,
         chronologyInsertions: input.settlement.chapterStateDelta.chronologyInsertions.length,
         worldRules: input.worldRules.rules.length,

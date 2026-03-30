@@ -45,7 +45,7 @@ node dist/index.js plan-next ./demo-workspace ember-fall 2
 
 - 会同时生成 `chapter-plan.json`
 - 也会生成 `context-pack.json`
-- `context-pack` 是 `Phase 2` 初版运行时上下文包，供 planner 与 writer 共用最近章节摘要、chronology slice、active open loops、角色当前状态和当前书稿阶段
+- `context-pack` 是 `Phase 2` 初版运行时上下文包，供 planner 与 writer 共用最近章节摘要、chronology slice、active open loops、recent reveals、recent relationship changes、角色当前状态和当前书稿阶段
 
 ### 4. 根据计划生成 writer 工作稿
 
@@ -85,7 +85,7 @@ node dist/index.js revise-cycle ./demo-workspace ember-fall 2 --override
 
 - 生成 writer 工作稿
 - `analysis -> reader -> scene audit`
-- `revise -> re-analysis -> re-reader`
+- `revise -> re-analysis -> re-reader -> re-settlement -> re-audit`
 - 如果当前版本已经通过 gate，本轮会直接跳过 revise
 - 如果修后仍未过线，不导出最终正文
 
@@ -102,10 +102,13 @@ node dist/index.js revise-until-pass ./demo-workspace ember-fall 2 --override --
   - `reader agent`
   - `scene audit`
   - `revise agent`
+  - `re-settlement`
+  - `re-audit`
 - 每轮都会读取 reader 建议继续修
 - 整条链按串行执行，不并行触发多个 LLM agent
 - 如果当前版本已经通过 gate，会直接停止并导出最终正文
 - 只有当 reader 过线且不存在硬结构阻断时，才会继续进入 `settlement -> continuity audit -> persist canonical state -> final prose export`
+- 当前 `settlement / continuity audit` 已经会在每一轮 revise 后重跑，最终 persist 只认改后账本
 - 只有 `continuity audit` 也通过时，才导出 `final/*.txt`
 - 如果达到最大轮次、没有实际改写、或连续一轮没有有效提升，则停止
 - CLI 的进度、retry、reader 分数和建议输出在 `stderr`，JSON 结果输出在 `stdout`
@@ -167,6 +170,8 @@ $env:STORYLAB_OPENAI_BASE_URL="https://your-compatible-endpoint/v1"
 - `books/<bookId>/story/settlement/chapter-XXXX.chapter-state-delta.json`
 - `books/<bookId>/story/plot/chronology.json`
 - `books/<bookId>/story/plot/open-loops.json`
+- `books/<bookId>/story/plot/reveals-ledger.json`
+- `books/<bookId>/story/characters/relationship-ledger.json`
 - `books/<bookId>/story/continuity/chapter-XXXX.continuity-report.json`
 
 ### 可选 world rules
@@ -180,8 +185,14 @@ $env:STORYLAB_OPENAI_BASE_URL="https://your-compatible-endpoint/v1"
   - 某些规则在触发条件成立时，是否出现必须承接的规则信号
 - continuity 现在还会检查最小版 `reveal continuity`
   - 当旧的 `mystery / question / promise` 看起来已经在正文中被揭示，但 settlement 没有把对应 loop 记成 `advanced / closed` 时，会触发 continuity 问题
+- settlement 现在会正式登记 `reveals ledger`
+  - 当旧的 `mystery / question / promise` 在本章被明确推进或揭示时，会写入 `reveals-ledger.json`
+  - continuity 会继续读取历史 reveal，检查同一条旧谜题是否在后续章节被写成互相冲突的真相版本
 - continuity 还会检查 `character state drift`
   - 当已跟踪角色的欲望 / 恐惧 / 误判在一章内发生突兀跳变，且正文缺少过渡桥接时，会触发角色状态连续性问题
+- settlement 现在也会正式登记 `relationship ledger`
+  - 当角色关系在本章发生可识别变化时，会写入 `relationship-ledger.json`
+  - continuity 会继续读取历史关系账本，检查同一对角色是否出现无桥接的敌我翻转
 - continuity 还会检查 `open loop contradiction / duplicate loop`
   - 当本章把旧 loop 名义关闭、却继续用正文强化后续压力，或把旧威胁换个名字重复新开时，会触发 loop 矛盾或重复开线问题
 
@@ -199,7 +210,7 @@ $env:STORYLAB_OPENAI_BASE_URL="https://your-compatible-endpoint/v1"
 - 如果 reader 已过线，但 `scene audit` 只剩质量型 high severity 问题，这些问题会被降为 `advisory`
 - 这类 advisory 会继续写入 review / comparison，但不会阻止 `final/*.txt` 导出
 - 当前 canonical 提交流程是：`settlement -> continuity audit -> persist canonical state -> final prose export`
-- `continuity_report` 会先写出；如果 continuity fail，则不会继续写 canonical `summary / delta / chronology / open-loops`，也不会导出 `final/*.txt`
+- `continuity_report` 会先写出；如果 continuity fail，则不会继续写 canonical `summary / delta / chronology / open-loops / reveals-ledger`，也不会导出 `final/*.txt`
 
 如果未满足条件：
 

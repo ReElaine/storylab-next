@@ -4,6 +4,7 @@ import type {
   ChapterDraft,
   ChapterPlan,
   CharacterHistory,
+  ContinuityReport,
   IssueResolution,
   PostRewriteAssessment,
   RevisionComparisonReport,
@@ -25,6 +26,7 @@ export interface RevisionInput {
   readonly plan: ChapterPlan;
   readonly analysis: ChapterAnalysisBundle;
   readonly sceneAudit: SceneAuditReport;
+  readonly continuityReport?: ContinuityReport;
   readonly characterHistory: ReadonlyArray<CharacterHistory>;
   readonly themeHistory: ThemeHistory;
   readonly styleGuide: StyleGuide;
@@ -74,14 +76,52 @@ function collectTargetSceneNumbers(input: RevisionInput): ReadonlyArray<number> 
   if (input.targetSceneNumbers && input.targetSceneNumbers.length > 0) {
     return dedupeNumbers(input.targetSceneNumbers);
   }
-  return dedupeNumbers(input.sceneAudit.issues.map((issue) => issue.sceneNumber));
+  const continuitySceneNumbers = (input.continuityReport?.issues ?? [])
+    .flatMap((issue) => {
+      const values: number[] = [];
+      if (issue.sceneNumber !== null) {
+        values.push(issue.sceneNumber);
+      }
+      for (const ref of issue.refs) {
+        const match = ref.match(/^scene-(\d+)$/u);
+        if (!match) {
+          continue;
+        }
+        const sceneNumber = Number.parseInt(match[1] ?? "", 10);
+        if (Number.isFinite(sceneNumber)) {
+          values.push(sceneNumber);
+        }
+      }
+      return values;
+    });
+
+  return dedupeNumbers([
+    ...input.sceneAudit.issues.map((issue) => issue.sceneNumber),
+    ...continuitySceneNumbers,
+  ]);
+}
+
+function collectRelatedContinuityIssues(
+  scene: SceneBlueprintItem,
+  continuityReport: ContinuityReport | undefined,
+): ReadonlyArray<ContinuityReport["issues"][number]> {
+  return (continuityReport?.issues ?? []).filter((issue) => (
+    issue.sceneNumber === scene.sceneNumber
+    || issue.refs.includes(`scene-${scene.sceneNumber}`)
+    || issue.message.includes(scene.drivingCharacter)
+    || issue.message.includes(scene.opposingForce)
+  ));
 }
 
 function buildSceneRewriteStrategy(
   scene: SceneBlueprintItem,
   issues: ReadonlyArray<SceneAuditIssue>,
+  continuityReport: ContinuityReport | undefined,
   readerSuggestions: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
+  const continuityRecommendations = collectRelatedContinuityIssues(scene, continuityReport)
+    .map((issue) => issue.recommendation);
+
   return dedupeStrings([
     `让 ${scene.drivingCharacter} 主动推动场景，并明确执行决策：${scene.decision}`,
     `让代价在场景中可见：${scene.cost}`,
@@ -89,6 +129,7 @@ function buildSceneRewriteStrategy(
     `把价值冲突写进动作或对白：${scene.valuePositionA} vs ${scene.valuePositionB}`,
     `遵守风格指令：${scene.styleDirective}`,
     ...issues.map((issue) => issue.recommendation),
+    ...continuityRecommendations,
     ...readerSuggestions,
   ]);
 }
@@ -98,6 +139,20 @@ function buildSceneRewriteReason(issues: ReadonlyArray<SceneAuditIssue>): Readon
     return ["该 scene 被选中进行局部重写"];
   }
   return dedupeStrings(issues.map((issue) => issue.problem));
+}
+
+function buildSceneRewriteReasonWithContinuity(
+  issues: ReadonlyArray<SceneAuditIssue>,
+  continuityReport: ContinuityReport | undefined,
+  scene: SceneBlueprintItem,
+): ReadonlyArray<string> {
+  const continuityReasons = collectRelatedContinuityIssues(scene, continuityReport)
+    .map((issue) => issue.message);
+
+  return dedupeStrings([
+    ...issues.map((issue) => issue.problem),
+    ...continuityReasons,
+  ]);
 }
 
 function pickSupportName(input: RevisionInput, scene: SceneBlueprintItem): string {
@@ -518,8 +573,13 @@ export class HeuristicReviseEngine implements ReviseEngine {
       if (!scene) continue;
 
       const issues = input.sceneAudit.issues.filter((issue) => issue.sceneNumber === scene.sceneNumber);
-      const reason = buildSceneRewriteReason(issues);
-        const strategy = buildSceneRewriteStrategy(scene, issues, input.analysis.readerReport.revisionSuggestions);
+      const reason = buildSceneRewriteReasonWithContinuity(issues, input.continuityReport, scene);
+      const strategy = buildSceneRewriteStrategy(
+        scene,
+        issues,
+        input.continuityReport,
+        input.analysis.readerReport.revisionSuggestions,
+      );
       const rewrittenContent = buildHeuristicSceneRewrite(sceneText.marker, scene, issues, pickSupportName(input, scene));
 
       if (rewrittenContent.trim() !== sceneText.content.trim()) {
@@ -578,8 +638,13 @@ export class OpenAIReviseEngine implements ReviseEngine {
       if (!scene) continue;
 
       const issues = input.sceneAudit.issues.filter((issue) => issue.sceneNumber === scene.sceneNumber);
-      const reason = buildSceneRewriteReason(issues);
-        const strategy = buildSceneRewriteStrategy(scene, issues, input.analysis.readerReport.revisionSuggestions);
+      const reason = buildSceneRewriteReasonWithContinuity(issues, input.continuityReport, scene);
+      const strategy = buildSceneRewriteStrategy(
+        scene,
+        issues,
+        input.continuityReport,
+        input.analysis.readerReport.revisionSuggestions,
+      );
 
       const response = await createChatCompletionWithRetry(this.client, {
         model: this.model,

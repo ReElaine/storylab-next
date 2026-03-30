@@ -1295,3 +1295,470 @@ test("continuity agent flags duplicate or contradictory open loop updates", () =
   assert.equal(report.blocking, true);
   assert.ok(report.issues.some((issue) => issue.code === "open_loop_conflict"));
 });
+
+test("continuity agent flags conflicting reveals for the same mystery across chapters", () => {
+  const agent = new ContinuityAgent();
+  const report = agent.audit({
+    chapterNumber: 6,
+    draft: {
+      chapterNumber: 6,
+      title: "暗号后的第二个名字",
+      content: "林凡终于知道，门铃声原来不是母亲留下的暗号，而是赵执事的人故意伪造的诱饵。",
+      summary: "工作稿",
+      basedOnPlan: 6,
+    },
+    plan: {
+      targetChapterNumber: 6,
+      chapterMission: "把旧谜题进一步揭开。",
+      readerGoal: "让旧谜题获得更明确的指向。",
+      sceneBlueprint: [
+        {
+          sceneId: "scene-1",
+          sceneAnchor: "scene-1-诱饵",
+          sceneNumber: 1,
+          pov: "林凡",
+          goal: "揭开门铃声背后的真相",
+          conflict: "旧线索和新证据对不上",
+          turn: "门铃声的意义被重新定义",
+          result: "真相指向赵执事的人",
+          newInformation: ["门铃声不是母亲留下的暗号，而是诱饵"],
+          emotionalShift: "发冷 -> 更冷",
+          drivingCharacter: "林凡",
+          opposingForce: "旧判断",
+          decision: "继续顺着新证据追下去",
+          cost: "旧认知被推翻",
+          relationshipChange: "赵执事与旧案关系更近",
+          thematicTension: "真相会反噬过去的判断",
+          valuePositionA: "停下保留旧解释",
+          valuePositionB: "接受更坏的新真相",
+          sceneStance: "压向更坏的真相",
+          styleDirective: "压低说明，保留冷意",
+        },
+      ],
+      characterIntent: [],
+      themeIntent: "真相会改写旧判断",
+      thematicQuestion: "真相越清楚，过去的解释是否越不可靠",
+      styleProfile: {
+        narrationStyle: "直接",
+        dialogueStyle: "克制",
+        pacingProfile: "快",
+        descriptionDensity: "低",
+        toneConstraints: [],
+      },
+      gateNote: "",
+    },
+    analysis: {
+      scenes: [
+        {
+          sceneId: "scene-1",
+          sceneAnchor: "scene-1-诱饵",
+          sceneNumber: 1,
+          pov: "林凡",
+          goal: "揭开门铃声背后的真相",
+          conflict: "旧线索和新证据对不上",
+          turn: "门铃声的意义被重新定义",
+          result: "真相指向赵执事的人",
+          newInformation: ["门铃声不是母亲留下的暗号，而是诱饵"],
+          emotionalShift: "发冷 -> 更冷",
+          sourceParagraphs: ["林凡终于知道，门铃声原来不是母亲留下的暗号。"],
+        },
+      ],
+      characterStates: [
+        {
+          name: "林凡",
+          desire: "找出母亲失踪真相",
+          fear: "真相说明自己一直追错了人",
+          misbelief: "旧线索至少有一半是可信的",
+          recentDecision: "继续顺着新证据追下去",
+          decisionCost: "旧认知被推翻",
+          relationshipShift: ["赵执事和旧案联系更紧"],
+          arcProgress: "被迫接受更坏的真相",
+          presentInChapter: true,
+        },
+      ],
+      themeReport: {
+        chapterNumber: 6,
+        activeThemes: [],
+      },
+      styleReport: {
+        averageSentenceLength: 14,
+        dialogueRatio: 0.05,
+        descriptionRatio: 0.2,
+        rhythmNote: "",
+        adherenceNote: "",
+        styleDriftPoints: [],
+        dialogueHomogeneitySpots: [],
+        descriptionBalanceNote: "",
+      },
+      readerReport: {
+        chapterNumber: 6,
+        scores: {
+          hook: 8,
+          momentum: 8,
+          emotionalPeak: 7,
+          suspense: 8,
+          memorability: 7,
+        },
+        summary: "旧谜题被明确改写。",
+        strengths: [],
+        risks: ["如果旧 reveal ledger 不更新，会和之前的真相版本冲突。"],
+        revisionSuggestions: [],
+      },
+      gateDecision: {
+        chapterNumber: 6,
+        gate: null,
+        required: false,
+        rationale: "",
+      },
+      revisionBrief: "",
+    },
+    settlement: {
+      chapterSummary: {
+        chapterNumber: 6,
+        title: "暗号后的第二个名字",
+        summary: "门铃声的真相被改写成另一套解释。",
+        keyEvents: ["门铃声被解释成诱饵"],
+        changedCharacters: [],
+        openedLoopIds: [],
+        advancedLoopIds: ["loop-ch0001-02"],
+        closedLoopIds: [],
+      },
+      chapterStateDelta: {
+        chapterNumber: 6,
+        title: "暗号后的第二个名字",
+        changedCharacters: [],
+        chronologyInsertions: [
+          {
+            eventId: "ch0006-scene-1",
+            chapterNumber: 6,
+            sceneNumber: 1,
+            sceneId: "scene-1",
+            actors: ["林凡", "赵执事"],
+            summary: "门铃声被指向赵执事的人",
+            consequence: "旧解释被推翻",
+          },
+        ],
+        updatedLoops: [
+          {
+            loopId: "loop-ch0001-02",
+            action: "advanced",
+            description: "母亲失踪那夜的门铃声到底意味着什么",
+            evidence: "scene-1",
+          },
+        ],
+        stateHighlights: ["门铃声真相换成了另一套说法"],
+      },
+      chronology: {
+        events: [
+          {
+            eventId: "ch0006-scene-1",
+            chapterNumber: 6,
+            sceneNumber: 1,
+            sceneId: "scene-1",
+            actors: ["林凡", "赵执事"],
+            summary: "门铃声被指向赵执事的人",
+            consequence: "旧解释被推翻",
+          },
+        ],
+      },
+      openLoops: {
+        loops: [
+          {
+            loopId: "loop-ch0001-02",
+            type: "mystery",
+            introducedInChapter: 1,
+            owner: "林凡",
+            description: "母亲失踪那夜的门铃声到底意味着什么",
+            expectedPayoffWindow: "soon",
+            urgency: "high",
+            status: "advanced",
+            payoffConstraints: ["近几章必须持续推进谜题"],
+            relatedEntities: ["林凡", "母亲", "门铃声"],
+            evidenceRefs: ["scene-1"],
+            lastUpdatedChapter: 6,
+          },
+        ],
+      },
+      reveals: {
+        entries: [
+          {
+            revealId: "reveal-ch0006-01",
+            chapterNumber: 6,
+            sceneNumber: 1,
+            sceneId: "scene-1",
+            sourceLoopId: "loop-ch0001-02",
+            category: "mystery",
+            subject: "母亲失踪那夜的门铃声到底意味着什么",
+            revealedTruth: "门铃声不是母亲留下的暗号，而是赵执事的人故意伪造的诱饵。",
+            revealStrength: "explicit",
+            knownByReader: true,
+            knownByCharacters: ["林凡"],
+            evidenceRefs: ["scene-1"],
+          },
+        ],
+      },
+    },
+    previousChronology: {
+      events: [],
+    },
+    previousOpenLoops: {
+      loops: [
+        {
+          loopId: "loop-ch0001-02",
+          type: "mystery",
+          introducedInChapter: 1,
+          owner: "林凡",
+          description: "母亲失踪那夜的门铃声到底意味着什么",
+          expectedPayoffWindow: "soon",
+          urgency: "high",
+          status: "advanced",
+          payoffConstraints: ["近几章必须持续推进谜题"],
+          relatedEntities: ["林凡", "母亲", "门铃声"],
+          evidenceRefs: ["scene-4"],
+          lastUpdatedChapter: 3,
+        },
+      ],
+    },
+    previousReveals: {
+      entries: [
+        {
+          revealId: "reveal-ch0003-01",
+          chapterNumber: 3,
+          sceneNumber: 1,
+          sceneId: "scene-1",
+          sourceLoopId: "loop-ch0001-02",
+          category: "mystery",
+          subject: "母亲失踪那夜的门铃声到底意味着什么",
+          revealedTruth: "门铃声是母亲故意留下的暗号。",
+          revealStrength: "explicit",
+          knownByReader: true,
+          knownByCharacters: ["林凡"],
+          evidenceRefs: ["scene-1"],
+        },
+      ],
+    },
+    previousCharacterHistory: [],
+    worldRules: {
+      rules: [],
+    },
+  });
+
+  assert.equal(report.blocking, true);
+  assert.ok(report.issues.some((issue) => issue.code === "reveal_conflict"));
+});
+
+test("continuity agent flags abrupt relationship drift when a hostile pair suddenly becomes allied", () => {
+  const agent = new ContinuityAgent();
+  const report = agent.audit({
+    chapterNumber: 3,
+    draft: {
+      chapterNumber: 3,
+      title: "暂时联手",
+      content: "林凡和赵执事一起把账册搬进偏厅，像什么都没发生过一样开始商量下一步。",
+      summary: "工作稿",
+      basedOnPlan: 3,
+    },
+    plan: {
+      targetChapterNumber: 3,
+      chapterMission: "把旧仇转成一次临时合作。",
+      readerGoal: "让关系变化带出新压力。",
+      sceneBlueprint: [
+        {
+          sceneId: "scene-1",
+          sceneAnchor: "scene-1-偏厅",
+          sceneNumber: 1,
+          pov: "林凡",
+          goal: "林凡与赵执事暂时联手",
+          conflict: "旧仇还在，但眼前需要共同处理账册",
+          turn: "两人默认先压下旧仇",
+          result: "关系从公开对立转成临时合作",
+          newInformation: ["账册问题迫使双方短暂站到同一边"],
+          emotionalShift: "警惕 -> 克制",
+          drivingCharacter: "林凡",
+          opposingForce: "赵执事",
+          decision: "先联手解决账册",
+          cost: "必须暂时压住旧仇",
+          relationshipChange: "林凡与赵执事突然联手",
+          thematicTension: "求生是否允许暂时妥协",
+          valuePositionA: "先活下来",
+          valuePositionB: "绝不低头",
+          sceneStance: "暂时偏向求生",
+          styleDirective: "克制",
+        },
+      ],
+      characterIntent: [],
+      themeIntent: "推进求生与自尊的冲突",
+      thematicQuestion: "旧仇能否被现实短暂压住",
+      styleProfile: {
+        narrationStyle: "直接",
+        dialogueStyle: "克制",
+        pacingProfile: "中快",
+        descriptionDensity: "低",
+        toneConstraints: [],
+      },
+      gateNote: "",
+    },
+    analysis: {
+      scenes: [
+        {
+          sceneId: "scene-1",
+          sceneAnchor: "scene-1-偏厅",
+          sceneNumber: 1,
+          pov: "林凡",
+          goal: "林凡与赵执事暂时联手",
+          conflict: "旧仇还在，但眼前需要共同处理账册",
+          turn: "两人默认先压下旧仇",
+          result: "关系从公开对立转成临时合作",
+          newInformation: ["账册问题迫使双方短暂站到同一边"],
+          emotionalShift: "警惕 -> 克制",
+          sourceParagraphs: ["林凡和赵执事一起把账册搬进偏厅，像什么都没发生过一样开始商量下一步。"],
+        },
+      ],
+      characterStates: [
+        {
+          name: "林凡",
+          desire: "先保住自己",
+          fear: "再被赵执事反咬一口",
+          misbelief: "只要先压住旧仇就能暂时安全",
+          recentDecision: "先和赵执事联手",
+          decisionCost: "必须压住旧仇",
+          relationshipShift: ["林凡与赵执事突然联手"],
+          arcProgress: "开始学会策略性妥协",
+          presentInChapter: true,
+        },
+        {
+          name: "赵执事",
+          desire: "先把账册问题压过去",
+          fear: "事情闹大后连自己也脱不了身",
+          misbelief: "暂时联手就能把旧账一笔带过",
+          recentDecision: "先和林凡联手",
+          decisionCost: "必须压住旧仇",
+          relationshipShift: ["赵执事与林凡突然联手"],
+          arcProgress: "开始策略性收手",
+          presentInChapter: true,
+        },
+      ],
+      themeReport: {
+        chapterNumber: 3,
+        activeThemes: [],
+      },
+      styleReport: {
+        averageSentenceLength: 15,
+        dialogueRatio: 0.2,
+        descriptionRatio: 0.2,
+        rhythmNote: "",
+        adherenceNote: "",
+        styleDriftPoints: [],
+        dialogueHomogeneitySpots: [],
+        descriptionBalanceNote: "",
+      },
+      readerReport: {
+        chapterNumber: 3,
+        scores: {
+          hook: 6,
+          momentum: 6,
+          emotionalPeak: 6,
+          suspense: 6,
+          memorability: 6,
+        },
+        summary: "关系发生变化，但过渡很薄。",
+        strengths: [],
+        risks: [],
+        revisionSuggestions: [],
+      },
+      gateDecision: {
+        chapterNumber: 3,
+        gate: null,
+        required: false,
+        rationale: "",
+      },
+      revisionBrief: "",
+    },
+    settlement: {
+      chapterSummary: {
+        chapterNumber: 3,
+        title: "暂时联手",
+        summary: "林凡与赵执事突然联手处理账册。",
+        keyEvents: ["林凡与赵执事突然联手处理账册"],
+        changedCharacters: [],
+        openedLoopIds: [],
+        advancedLoopIds: [],
+        closedLoopIds: [],
+      },
+      chapterStateDelta: {
+        chapterNumber: 3,
+        title: "暂时联手",
+        changedCharacters: [],
+        chronologyInsertions: [
+          {
+            eventId: "ch0003-scene-1",
+            chapterNumber: 3,
+            sceneNumber: 1,
+            sceneId: "scene-1",
+            actors: ["林凡", "赵执事"],
+            summary: "林凡与赵执事一起处理账册",
+            consequence: "两人暂时站到同一边",
+          },
+        ],
+        updatedLoops: [],
+        stateHighlights: ["旧仇被突然压下"],
+      },
+      chronology: {
+        events: [
+          {
+            eventId: "ch0003-scene-1",
+            chapterNumber: 3,
+            sceneNumber: 1,
+            sceneId: "scene-1",
+            actors: ["林凡", "赵执事"],
+            summary: "林凡与赵执事一起处理账册",
+            consequence: "两人暂时站到同一边",
+          },
+        ],
+      },
+      openLoops: {
+        loops: [],
+      },
+      reveals: {
+        entries: [],
+      },
+      relationships: {
+        entries: [
+          {
+            relationshipId: "林凡::赵执事",
+            characters: ["林凡", "赵执事"],
+            status: "林凡与赵执事突然联手",
+            polarity: "allied",
+            tension: "medium",
+            lastChange: "林凡与赵执事突然联手",
+            lastUpdatedChapter: 3,
+            evidenceRefs: ["scene-1"],
+          },
+        ],
+      },
+    },
+    previousChronology: { events: [] },
+    previousOpenLoops: { loops: [] },
+    previousRelationships: {
+      entries: [
+        {
+          relationshipId: "林凡::赵执事",
+          characters: ["林凡", "赵执事"],
+          status: "林凡与赵执事公开对立",
+          polarity: "hostile",
+          tension: "high",
+          lastChange: "林凡与赵执事公开对立",
+          lastUpdatedChapter: 2,
+          evidenceRefs: ["scene-4"],
+        },
+      ],
+    },
+    previousCharacterHistory: [],
+    worldRules: {
+      rules: [],
+    },
+  });
+
+  assert.equal(report.blocking, true);
+  assert.ok(report.issues.some((issue) => issue.code === "relationship_conflict"));
+});

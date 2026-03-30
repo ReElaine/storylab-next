@@ -8,6 +8,10 @@ import type {
   ChronologyLedger,
   OpenLoopEntry,
   OpenLoopsLedger,
+  RelationshipLedger,
+  RelationshipLedgerEntry,
+  RevealEntry,
+  RevealsLedger,
   SceneBlueprintItem,
   SettlementBundle,
 } from "../types.js";
@@ -20,14 +24,19 @@ interface SettlementInput {
   readonly analysis: ChapterAnalysisBundle;
   readonly previousChronology: ChronologyLedger;
   readonly previousOpenLoops: OpenLoopsLedger;
+  readonly previousRelationships?: RelationshipLedger;
 }
 
 const OPEN_LOOP_SIGNAL = /会|将|后续|下月|以后|下一章|必须|不得不|记恨|打压|断供|危险|真相|秘密|悬念|报复|安排|盯上|后果|隐患|威胁|追查/u;
 const CLOSE_SIGNAL = /解决|兑现|结束|了结|揭晓|落定|拿回|达成|关闭/u;
+const REVEAL_SIGNAL = /真相|秘密|原来|其实|终于知道|终于明白|揭开|说破|暴露|看穿/u;
 const EVENT_SIGNAL = /夺回|反抗|出手|抢走|拿回|宣布|安排|记恨|断供|打压|发现|得知|接受|拒绝|逼迫|离开|反击|爆发|命令/u;
 const CONSEQUENCE_SIGNAL = /后续|下月|以后|下一章|记恨|打压|断供|危险|报复|安排|盯上|后果|隐患|威胁|践踏|失去/u;
 const META_NARRATIVE_SIGNAL = /本章|场景|真正推动这个场景|剧情动作|价值站队|立场压向|revision brief|gate|scene/iu;
 const IMMEDIATE_ACTION_SIGNAL = /揣入|捏住|撞得|挤了过来|看也没看|不躲不闪|侧面一偏/u;
+const RELATIONSHIP_HOSTILE_SIGNAL = /对立|结仇|记恨|打压|围剿|眼中钉|撕破脸|敌视|仇|报复/u;
+const RELATIONSHIP_ALLIED_SIGNAL = /联手|结盟|信任|合作|协作|靠近|站到一起|同路|缓和|和解/u;
+const RELATIONSHIP_STRAINED_SIGNAL = /试探|警惕|怀疑|拉开|重新划线|高压协作|疏离|僵住/u;
 
 function uniqueStrings(values: ReadonlyArray<string>): ReadonlyArray<string> {
   return Array.from(new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)));
@@ -585,6 +594,189 @@ function createNewLoopCandidates(
     });
 }
 
+function inferRevealStrength(text: string, shouldClose: boolean): RevealEntry["revealStrength"] {
+  if (shouldClose || /原来|其实|终于知道|终于明白|说破|揭开/u.test(text)) {
+    return "explicit";
+  }
+  if (/真相|秘密|暴露|看穿/u.test(text)) {
+    return "partial";
+  }
+  return "hinted";
+}
+
+function buildRevealSentence(
+  evidence: string,
+  keywords: ReadonlyArray<string>,
+  entities: ReadonlyArray<string>,
+  fallback: string,
+): string {
+  const candidate = pickBestSentence(evidence, keywords, entities, "consequence");
+  if (candidate && REVEAL_SIGNAL.test(candidate)) {
+    return trimSentence(normalizeLedgerPhrase(candidate), 72);
+  }
+  return trimSentence(normalizeLedgerPhrase(fallback), 72);
+}
+
+function buildReveals(
+  input: SettlementInput,
+  chronologyInsertions: ReadonlyArray<ChronologyEvent>,
+  chapterSignals: string,
+  sceneEvidenceMap: ReadonlyMap<number, string>,
+  loopStatusMap: ReadonlyMap<string, "open" | "advanced" | "closed">,
+): RevealsLedger {
+  const entries: RevealEntry[] = [];
+
+  for (const loop of input.previousOpenLoops.loops) {
+    if (loop.status === "closed") {
+      continue;
+    }
+    if (!["mystery", "question", "promise"].includes(loop.type)) {
+      continue;
+    }
+
+    const loopKeywords = extractKeywords(loop.description);
+    const hasLoopSignal = loopKeywords.some((keyword) => chapterSignals.includes(keyword))
+      || loop.relatedEntities.some((entity) => entity.length > 0 && chapterSignals.includes(entity));
+    if (!hasLoopSignal || !REVEAL_SIGNAL.test(chapterSignals)) {
+      continue;
+    }
+
+    const matchingEvent = chronologyInsertions
+      .map((event) => {
+        let score = 0;
+        score += loopKeywords.filter((keyword) => event.summary.includes(keyword) || event.consequence.includes(keyword)).length * 2;
+        score += loop.relatedEntities.filter((entity) => event.actors.includes(entity)).length * 2;
+        if (REVEAL_SIGNAL.test(event.summary)) score += 3;
+        if (REVEAL_SIGNAL.test(event.consequence)) score += 4;
+        return { event, score };
+      })
+      .sort((left, right) => right.score - left.score)[0]?.event;
+
+    const sceneNumber = matchingEvent?.sceneNumber ?? null;
+    const evidence = sceneNumber !== null ? (sceneEvidenceMap.get(sceneNumber) ?? chapterSignals) : chapterSignals;
+    const action = loopStatusMap.get(loop.loopId) ?? loop.status;
+    const revealStrength = inferRevealStrength(evidence, action === "closed");
+    const revealedTruth = buildRevealSentence(
+      evidence,
+      loopKeywords,
+      loop.relatedEntities,
+      matchingEvent?.consequence ?? matchingEvent?.summary ?? loop.description,
+    );
+
+    entries.push({
+      revealId: `reveal-ch${String(input.chapterNumber).padStart(4, "0")}-${String(entries.length + 1).padStart(2, "0")}`,
+      chapterNumber: input.chapterNumber,
+      sceneNumber,
+      sceneId: matchingEvent?.sceneId,
+      sourceLoopId: loop.loopId,
+      category: loop.type as RevealEntry["category"],
+      subject: loop.description,
+      revealedTruth,
+      revealStrength,
+      knownByReader: true,
+      knownByCharacters: matchingEvent?.actors ?? loop.relatedEntities,
+      evidenceRefs: sceneNumber !== null ? [`scene-${sceneNumber}`] : loop.evidenceRefs,
+    } satisfies RevealEntry);
+  }
+
+  return { entries };
+}
+
+function buildRelationshipId(left: string, right: string): string {
+  return [left, right].sort((a, b) => a.localeCompare(b, "zh-Hans-CN")).join("::");
+}
+
+function inferRelationshipPolarity(text: string): RelationshipLedgerEntry["polarity"] {
+  if (RELATIONSHIP_HOSTILE_SIGNAL.test(text)) {
+    return "hostile";
+  }
+  if (RELATIONSHIP_ALLIED_SIGNAL.test(text)) {
+    return "allied";
+  }
+  if (RELATIONSHIP_STRAINED_SIGNAL.test(text)) {
+    return "strained";
+  }
+  return "neutral";
+}
+
+function inferRelationshipTension(
+  text: string,
+  polarity: RelationshipLedgerEntry["polarity"],
+): RelationshipLedgerEntry["tension"] {
+  if (RELATIONSHIP_HOSTILE_SIGNAL.test(text) || /高压|围剿|断供|报复/u.test(text)) {
+    return "high";
+  }
+  if (polarity === "strained" || RELATIONSHIP_STRAINED_SIGNAL.test(text)) {
+    return "medium";
+  }
+  if (polarity === "allied" && /结盟|和解|联手/u.test(text)) {
+    return "low";
+  }
+  return polarity === "neutral" ? "low" : "medium";
+}
+
+function findRelationshipEvidenceRefs(
+  left: string,
+  right: string,
+  sceneEvidenceMap: ReadonlyMap<number, string>,
+): ReadonlyArray<string> {
+  const refs: string[] = [];
+  for (const [sceneNumber, evidence] of sceneEvidenceMap.entries()) {
+    if (evidence.includes(left) && evidence.includes(right)) {
+      refs.push(`scene-${sceneNumber}`);
+    }
+  }
+
+  return refs.length > 0 ? refs.slice(0, 2) : [];
+}
+
+function buildRelationships(
+  input: SettlementInput,
+  sceneEvidenceMap: ReadonlyMap<number, string>,
+): RelationshipLedger {
+  const knownNames = uniqueStrings([
+    ...input.analysis.characterStates
+      .filter((state) => state.presentInChapter)
+      .map((state) => state.name),
+    ...input.plan.sceneBlueprint.flatMap((scene) => [scene.pov, scene.drivingCharacter, scene.opposingForce]),
+  ]);
+  const nextEntries = new Map(
+    (input.previousRelationships?.entries ?? []).map((entry) => [entry.relationshipId, entry] as const),
+  );
+
+  for (const state of input.analysis.characterStates.filter((entry) => entry.presentInChapter)) {
+    for (const shift of state.relationshipShift) {
+      const targets = knownNames.filter((name) => name !== state.name && shift.includes(name));
+      for (const target of targets) {
+        const characters = [state.name, target].sort((a, b) => a.localeCompare(b, "zh-Hans-CN")) as [string, string];
+        const relationshipId = buildRelationshipId(characters[0], characters[1]);
+        const normalizedChange = trimSentence(normalizeLedgerPhrase(shift), 72);
+        const previousEntry = nextEntries.get(relationshipId);
+        const polarity = inferRelationshipPolarity(shift);
+        const tension = inferRelationshipTension(shift, polarity);
+        const evidenceRefs = findRelationshipEvidenceRefs(state.name, target, sceneEvidenceMap);
+
+        nextEntries.set(relationshipId, {
+          relationshipId,
+          characters,
+          status: normalizedChange,
+          polarity,
+          tension,
+          lastChange: normalizedChange,
+          lastUpdatedChapter: input.chapterNumber,
+          evidenceRefs: evidenceRefs.length > 0 ? evidenceRefs : (previousEntry?.evidenceRefs ?? []),
+        } satisfies RelationshipLedgerEntry);
+      }
+    }
+  }
+
+  return {
+    entries: Array.from(nextEntries.values()).sort((left, right) => (
+      left.lastUpdatedChapter - right.lastUpdatedChapter || left.relationshipId.localeCompare(right.relationshipId, "zh-Hans-CN")
+    )),
+  };
+}
+
 function summarizeChangedCharacters(input: SettlementInput): ChapterSummaryRecord["changedCharacters"] {
   return input.analysis.characterStates
     .filter((state) => state.presentInChapter)
@@ -640,6 +832,9 @@ export class SettlementAgent {
     const nextOpenLoops: OpenLoopsLedger = {
       loops: [...updatedExistingLoops, ...newLoops],
     };
+    const loopStatusMap = new Map(nextOpenLoops.loops.map((loop) => [loop.loopId, loop.status] as const));
+    const reveals = buildReveals(input, chronologyInsertions, chapterSignals, sceneEvidenceMap, loopStatusMap);
+    const relationships = buildRelationships(input, sceneEvidenceMap);
 
     const openedLoopIds = loopUpdates.filter((loop) => loop.action === "opened").map((loop) => loop.loopId);
     const advancedLoopIds = loopUpdates.filter((loop) => loop.action === "advanced").map((loop) => loop.loopId);
@@ -685,6 +880,8 @@ export class SettlementAgent {
       chapterStateDelta,
       chronology: nextChronology,
       openLoops: nextOpenLoops,
+      reveals,
+      relationships,
     };
   }
 }

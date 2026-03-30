@@ -38,6 +38,8 @@ export class HeuristicPlanningEngine implements PlanningEngine {
       input.contextPack.recentChapterSummaries,
       { events: input.contextPack.chronologySlice },
       { loops: input.contextPack.activeOpenLoops },
+      { entries: input.contextPack.recentReveals },
+      { entries: input.contextPack.recentRelationshipChanges },
       input.gates,
       input.styleGuide,
     );

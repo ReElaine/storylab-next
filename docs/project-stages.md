@@ -219,17 +219,17 @@
 当前主阶段有两条并行但主次分明的路线：
 
 1. 单章质量路线：`阶段八：质量增强与策略深化`
-2. 跨章连续写作路线：`Phase 3: Continuity Audit`
+2. 跨章连续写作路线：`Phase 4: Re-settlement`
 
 当前更优先的主阶段是：
 
-`跨章连续写作路线的 Phase 3：Continuity Audit`
+`跨章连续写作路线的 Phase 4：Re-settlement`
 
 当前最重要的目标是：
 
-1. 把 `settlement -> continuity -> persist -> plan-next` 这条跨章主链做稳
-2. 让 continuity gate 真正成为 canonical commit 之前的独立审计层
-3. 在真实样例里验证 Phase 1 / Phase 2 / Phase 3 的连续收益
+1. 把 `revise -> re-settlement -> re-audit -> persist` 这条修订后 canonical 主链做稳
+2. 让任何正文改动都基于“改后账本”重新判断是否允许提交
+3. 在真实样例里验证 Phase 1 / Phase 2 / Phase 3 / Phase 4 的串行收益
 4. 只在不破坏跨章主线的前提下，继续做单章质量优化
 
 当前不应该优先做的事情：
@@ -260,6 +260,13 @@
 3. Continuity Audit
 4. Re-settlement
 
+当前落地状态：
+
+- Phase 1：已完成初版
+- Phase 2：已完成初版
+- Phase 3：已完成初版
+- Phase 4：已进入初版实现
+
 更新：
 
 - `Phase 1: Settlement Layer` 已完成初版实现
@@ -268,16 +275,20 @@
   - `chapter-state-delta`
   - `chronology`
   - `open-loops`
+  - `reveals-ledger`
+  - `relationship-ledger`
 - `Phase 2: State-Driven Planning` 已进入初版实现
   - `plan-next` 会先生成 `context-pack`
   - planner 现在通过 `context-pack` 读取：
     - recent chapter summaries
     - chronology slice
     - active open loops
+    - recent reveals
+    - recent relationship changes
     - relevant character states
     - current book phase（初版 heuristic）
   - writer 也已开始消费同一份 `context-pack`
-- `Phase 3: Continuity Audit` 已进入最小实现
+- `Phase 3: Continuity Audit` 已完成初版
   - 新增 `ContinuityAgent`
   - settlement 后会生成 `story/continuity/chapter-XXXX.continuity-report.json`
   - continuity fail 时阻止 canonical persist
@@ -286,22 +297,30 @@
     - scene coverage
     - open loop continuity
     - reveal continuity
+    - reveal conflict
     - tracked character state continuity
     - character state drift
+    - relationship drift
     - open loop contradiction / duplicate loop
     - 可选 `world-rules.json` 规则检查
 
-但当前还未进入：
+-- `Phase 4: Re-settlement` 已进入初版实现
+  - `revise-cycle / revise-until-pass` 每一轮 revise 后都会重跑 settlement
+  - 每一轮 revise 后都会重跑 continuity audit
+  - canonical persist 只认改后账本
 
-- re-settlement
-- relationship / reveals / theme progression 的完整账本
+但当前仍未完成：
+
+- theme progression 的完整账本
+- scene 增量重结算
+- 更细的 canonical delta merge
 
 这条路线当前已经不只是“立项记录”，而是：
 
 - 已经完成 Phase 1 初版
 - 已完成 Phase 2 初版
-- 已进入 Phase 3 最小实现
-- 后续继续推进 Phase 3 深化与 Phase 4
+- 已完成 Phase 3 初版
+- 已进入 Phase 4 初版实现
 
 ## 4. 当前优先级
 

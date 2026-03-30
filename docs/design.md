@@ -245,7 +245,7 @@ flowchart TD
 下一条明确升级路线是：
 
 1. `Settlement Layer`
-   - 在最终提交链中正式生成 `chapter_summary / state_delta / chronology / open_loops`
+   - 在最终提交链中正式生成 `chapter_summary / state_delta / chronology / open_loops / reveals-ledger / relationship-ledger`
 2. `State-Driven Planning`
    - 让 `plan-next` 基于状态账本，而不是只依赖前文拼接
    - 当前已落地初版 `ContextAssembler` 与 `context-pack`
@@ -254,8 +254,24 @@ flowchart TD
      - recent chapter summaries
      - chronology slice
      - active open loops
+     - recent reveals
+     - recent relationship changes
      - relevant character states
      - current book phase（当前先 heuristic 推断）
+3. `Continuity Audit`
+   - canonical persist 前必须经过独立 `continuity agent`
+   - 当前最小检查项包括：
+     - scene coverage
+     - timeline
+     - open loop continuity / contradiction / duplicate loop
+     - reveal continuity / conflict
+     - character state drift
+     - relationship drift
+     - 最小版 world rules
+4. `Re-settlement`
+   - 每一轮 `revise` 后都会重新执行 settlement 和 continuity audit
+   - `revise-cycle / revise-until-pass` 的 pass 判定基于“改后账本”
+   - canonical persist 只认最后一次 revise 后的 `settlement + continuity report`
 3. `Continuity Audit`
   - 新增独立于 reader 的 continuity gate
   - 当前最小实现已经落地：
@@ -266,7 +282,9 @@ flowchart TD
     - timeline
     - scene coverage
     - open loop continuity
+    - reveal continuity / reveal conflict
     - tracked character state continuity
+    - relationship drift
 4. `Re-settlement`
   - revise 后重新结算状态，只认最终正文对应的账本
 
