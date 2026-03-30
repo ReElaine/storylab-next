@@ -2,6 +2,7 @@ import type {
   ChapterDraft,
   ChapterPlan,
   CharacterHistory,
+  ContextPack,
   SceneBlueprintItem,
   StyleProfile,
   ThemeHistory,
@@ -11,6 +12,7 @@ import { createChatCompletionWithRetry, createOpenAIClient, resolveOpenAIConfig 
 
 export interface WriterGenerationInput {
   readonly plan: ChapterPlan;
+  readonly contextPack?: ContextPack;
   readonly characterHistory: ReadonlyArray<CharacterHistory>;
   readonly themeHistory: ThemeHistory;
 }
@@ -109,6 +111,13 @@ function buildWriterPrompt(input: WriterGenerationInput): string {
   const sceneBlueprint = input.plan.sceneBlueprint.map(renderSceneBlueprint).join("\n\n");
   const characters = compactCharacterDossiers(input.characterHistory);
   const themes = compactThemeHistory(input.themeHistory);
+  const contextPack = input.contextPack
+    ? [
+      "状态驱动上下文包：",
+      JSON.stringify(input.contextPack, null, 2),
+      "",
+    ].join("\n")
+    : "";
 
   return [
     "你现在不是在解释计划，而是在写一章真正可读的中文网文正文。",
@@ -127,6 +136,7 @@ function buildWriterPrompt(input: WriterGenerationInput): string {
     "最近主题轨迹：",
     themes,
     "",
+    contextPack,
     "风格约束：",
     styleProfile,
     "",

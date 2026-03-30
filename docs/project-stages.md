@@ -216,22 +216,27 @@
 
 ## 3. 当前阶段
 
-当前主阶段是：
+当前主阶段有两条并行但主次分明的路线：
 
-`阶段八：质量增强与策略深化`
+1. 单章质量路线：`阶段八：质量增强与策略深化`
+2. 跨章连续写作路线：`Phase 3: Continuity Audit`
+
+当前更优先的主阶段是：
+
+`跨章连续写作路线的 Phase 3：Continuity Audit`
 
 当前最重要的目标是：
 
-1. 提升 writer 初稿质量，而不是依赖 revise 救火
-2. 继续压低全 LLM 串行链路耗时
-3. 让 rewrite effectiveness 与人类编辑判断更一致
-4. 在 reader 优先策略下继续优化 scene audit 的 advisory 质量
+1. 把 `settlement -> continuity -> persist -> plan-next` 这条跨章主链做稳
+2. 让 continuity gate 真正成为 canonical commit 之前的独立审计层
+3. 在真实样例里验证 Phase 1 / Phase 2 / Phase 3 的连续收益
+4. 只在不破坏跨章主线的前提下，继续做单章质量优化
 
 当前不应该优先做的事情：
 
 - 继续横向增加新模块
 - 过早做 UI / 可视化
-- 过早把重点放到更复杂的模型路由
+- 在 continuity 主链未站稳前，把重点再次全部拉回单章 prompt 微调
 
 ## 3.1 下一条架构升级主线
 
@@ -263,28 +268,46 @@
   - `chapter-state-delta`
   - `chronology`
   - `open-loops`
-- `plan-next` 也已经开始读取这些账本
+- `Phase 2: State-Driven Planning` 已进入初版实现
+  - `plan-next` 会先生成 `context-pack`
+  - planner 现在通过 `context-pack` 读取：
+    - recent chapter summaries
+    - chronology slice
+    - active open loops
+    - relevant character states
+    - current book phase（初版 heuristic）
+  - writer 也已开始消费同一份 `context-pack`
+- `Phase 3: Continuity Audit` 已进入最小实现
+  - 新增 `ContinuityAgent`
+  - settlement 后会生成 `story/continuity/chapter-XXXX.continuity-report.json`
+  - continuity fail 时阻止 canonical persist
+  - 当前已检查：
+    - timeline
+    - scene coverage
+    - open loop continuity
+    - tracked character state continuity
+    - 可选 `world-rules.json` 规则检查
 
 但当前还未进入：
 
-- continuity gate
 - re-settlement
 - relationship / reveals / theme progression 的完整账本
 
 这条路线当前已经不只是“立项记录”，而是：
 
 - 已经完成 Phase 1 初版
-- 正在准备进入 Phase 2（State-Driven Planning）
-- 后续会继续进入 Phase 3 / Phase 4
+- 已完成 Phase 2 初版
+- 已进入 Phase 3 最小实现
+- 后续继续推进 Phase 3 深化与 Phase 4
 
 ## 4. 当前优先级
 
 ### P0
 
-- 提升 writer 初稿质感
+- 验证 `settlement -> continuity -> persist -> plan-next` 在真实样例中的稳定收益
+- 深化 continuity report 的检查质量
 - 降低全 LLM 串行链路耗时
 - 强化 rewrite effectiveness 与人类判断的一致性
-- 继续收敛 reader 优先 gate 下的 advisory 解释
 
 ### P1
 

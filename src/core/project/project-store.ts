@@ -8,12 +8,14 @@ import type {
   CharacterHistory,
   CharacterSeed,
   ChronologyLedger,
+  ContextPack,
   HumanGate,
   OpenLoopsLedger,
   StoryMemory,
   StyleGuide,
   ThemeHistory,
   ThemeSeed,
+  WorldRulesConfig,
 } from "../types.js";
 import { toChapterSlug } from "../utils/text.js";
 
@@ -52,6 +54,12 @@ export class ProjectStore {
     return this.readJson<ReadonlyArray<HumanGate>>(
       join(this.storyDir(bookId), "human-gates", "gates.json"),
     );
+  }
+
+  async loadWorldRules(bookId: string): Promise<WorldRulesConfig> {
+    return this.readJsonOrDefault(join(this.storyDir(bookId), "canon", "world-rules.json"), {
+      rules: [],
+    });
   }
 
   async loadChapter(bookId: string, chapterNumber: number): Promise<string> {
@@ -117,11 +125,14 @@ export class ProjectStore {
       mkdir(join(storyDir, "reviews", "revisions"), { recursive: true }),
       mkdir(join(storyDir, "revisions"), { recursive: true }),
       mkdir(join(storyDir, "style"), { recursive: true }),
+      mkdir(join(storyDir, "canon"), { recursive: true }),
       mkdir(join(storyDir, "human-gates"), { recursive: true }),
       mkdir(join(storyDir, "planning"), { recursive: true }),
       mkdir(join(storyDir, "memory"), { recursive: true }),
       mkdir(join(storyDir, "settlement"), { recursive: true }),
       mkdir(join(storyDir, "plot"), { recursive: true }),
+      mkdir(join(storyDir, "context"), { recursive: true }),
+      mkdir(join(storyDir, "continuity"), { recursive: true }),
       mkdir(join(storyDir, "writers-internal"), { recursive: true }),
       mkdir(join(storyDir, "drafts-internal"), { recursive: true }),
       mkdir(join(storyDir, "revisions", "internal"), { recursive: true }),
@@ -193,6 +204,13 @@ export class ProjectStore {
   async loadChapterPlan(bookId: string, chapterNumber: number): Promise<ChapterPlan | null> {
     return this.readJsonOrDefault<ChapterPlan | null>(
       join(this.storyDir(bookId), "planning", this.chapterFileName(chapterNumber, "chapter-plan.json")),
+      null,
+    );
+  }
+
+  async loadContextPack(bookId: string, chapterNumber: number): Promise<ContextPack | null> {
+    return this.readJsonOrDefault<ContextPack | null>(
+      join(this.storyDir(bookId), "context", this.chapterFileName(chapterNumber, "context-pack.json")),
       null,
     );
   }

@@ -1,8 +1,10 @@
-import { buildRevisionBrief } from "../modules/revision-brief.js";
+﻿import { buildRevisionBrief } from "../modules/revision-brief.js";
 import { HistoryBuilder } from "../modules/history-builder.js";
 import { HumanReviewGatekeeper } from "../modules/human-review-gates.js";
 import { SettlementAgent } from "../modules/settlement-agent.js";
+import { ContinuityAgent } from "../modules/continuity-agent.js";
 import { SceneAuditor } from "../modules/scene-auditor.js";
+import { ContextAssembler } from "../modules/context-assembler.js";
 import { createAnalysisEngineFromEnv, type AnalysisEngine } from "../llm/analysis-engine.js";
 import { createPlanningEngineFromEnv, type PlanningEngine } from "../llm/planning-engine.js";
 import { createReaderCriticEngineFromEnv, type ReaderCriticEngine } from "../llm/reader-engine.js";
@@ -19,6 +21,7 @@ import type {
   ChapterAnalysisBundle,
   ChapterDraft,
   ChapterPlan,
+  ContinuityFinalizeResult,
   StorylabWriterCycleResult,
   StorylabWriterResult,
   WriterReviewArtifacts,
@@ -204,7 +207,7 @@ interface PrecomputedRevisionState {
 }
 
 export interface StorylabProgressEvent {
-  readonly stage: "plan" | "writer" | "analysis" | "reader" | "revise" | "gate" | "persist" | "loop";
+  readonly stage: "plan" | "writer" | "analysis" | "reader" | "revise" | "gate" | "persist" | "continuity" | "loop";
   readonly detail: string;
   readonly iteration?: number;
 }
@@ -220,6 +223,8 @@ export class StorylabRunner {
   private readonly sceneAuditor = new SceneAuditor();
   private readonly gatekeeper = new HumanReviewGatekeeper();
   private readonly settlementAgent = new SettlementAgent();
+  private readonly continuityAgent = new ContinuityAgent();
+  private readonly contextAssembler = new ContextAssembler();
   private readonly progressReporter?: (event: StorylabProgressEvent) => void;
 
   constructor(workspaceRoot: string, options?: { progressReporter?: (event: StorylabProgressEvent) => void }) {
@@ -285,7 +290,8 @@ export class StorylabRunner {
   async planNext(bookId: string, targetChapterNumber: number): Promise<StorylabPlanResult> {
     await this.store.ensureStoryDirs(bookId);
     this.report("plan", `开始规划第 ${targetChapterNumber} 章`);
-    const [styleGuide, characterHistory, themeHistory, storyMemory, chapterSummaries, chronology, openLoops, gates] = await Promise.all([
+    const [book, styleGuide, characterHistory, themeHistory, storyMemory, chapterSummaries, chronology, openLoops, gates] = await Promise.all([
+      this.store.loadBook(bookId),
       this.store.loadStyleGuide(bookId),
       this.store.loadCharacterHistory(bookId),
       this.store.loadThemeHistory(bookId),
@@ -296,14 +302,28 @@ export class StorylabRunner {
       this.store.loadHumanGates(bookId),
     ]);
 
+    const contextPack = this.contextAssembler.assemblePlanContext({
+      book,
+      targetChapterNumber,
+      chapterSummaries,
+      characterHistory,
+      chronology,
+      openLoops,
+    });
+
+    const contextPackPath = await this.store.writeOutput(
+      bookId,
+      "context",
+      this.store.chapterFileName(targetChapterNumber, "context-pack.json"),
+      JSON.stringify(contextPack, null, 2),
+    );
+
     const plan = await this.planningEngine.plan({
       targetChapterNumber,
       characterHistory,
+      contextPack,
       themeHistory,
       memory: storyMemory,
-      chapterSummaries,
-      chronology,
-      openLoops,
       gates,
       styleGuide,
     });
@@ -319,6 +339,7 @@ export class StorylabRunner {
       bookId,
       targetChapterNumber,
       outputPath,
+      contextPackPath,
       provider: this.planningEngine.name,
     };
   }
@@ -326,8 +347,9 @@ export class StorylabRunner {
   async writerFromPlan(bookId: string, targetChapterNumber: number): Promise<StorylabWriterResult> {
     await this.store.ensureStoryDirs(bookId);
     this.report("writer", `开始生成第 ${targetChapterNumber} 章工作稿`);
-    const [plan, characterHistory, themeHistory] = await Promise.all([
+    const [plan, contextPack, characterHistory, themeHistory] = await Promise.all([
       this.store.loadChapterPlan(bookId, targetChapterNumber),
+      this.store.loadContextPack(bookId, targetChapterNumber),
       this.store.loadCharacterHistory(bookId),
       this.store.loadThemeHistory(bookId),
     ]);
@@ -336,7 +358,7 @@ export class StorylabRunner {
       throw new Error(`No chapter plan found for chapter ${targetChapterNumber}. Run plan-next first.`);
     }
 
-    const draft = await this.writerAgent.generate({ plan, characterHistory, themeHistory });
+    const draft = await this.writerAgent.generate({ plan, contextPack: contextPack ?? undefined, characterHistory, themeHistory });
     const writerWorkingPath = await this.store.writeWriterWorking(bookId, draft);
     this.report("writer", `第 ${targetChapterNumber} 章工作稿已写入`);
 
@@ -437,10 +459,14 @@ export class StorylabRunner {
     };
 
     const pass = await this.executeRevisionPass(ctx, initialWriterDraft, override);
-    const finalProsePath = pass.postRevisionGate.blocking ? null : await this.store.writeFinalProse(bookId, pass.revisedDraft);
-    const settlementPaths = finalProsePath
-      ? await this.settleAcceptedChapter(ctx, pass.revisedDraft, pass.afterAnalysis)
-      : null;
+    const finalized: ContinuityFinalizeResult = pass.postRevisionGate.blocking
+      ? {
+          finalProsePath: null,
+          settlementPaths: null,
+          continuityReportPath: null,
+          continuityBlocking: false,
+        }
+      : await this.finalizeAcceptedChapter(ctx, pass.revisedDraft, pass.afterAnalysis);
 
     return {
       bookId,
@@ -457,8 +483,10 @@ export class StorylabRunner {
       reviseProvider: this.reviseEngine.name,
       blockingGate: pass.blockingGate,
       postRevisionGate: pass.postRevisionGate,
-      finalProsePath,
-      settlementPaths,
+      finalProsePath: finalized.finalProsePath,
+      settlementPaths: finalized.settlementPaths,
+      continuityReportPath: finalized.continuityReportPath,
+      continuityBlocking: finalized.continuityBlocking,
       targetSceneNumbers: pass.revisionTrace.targetSceneNumbers,
       actualRewrittenSceneNumbers: pass.revisionTrace.actualRewrittenSceneNumbers,
       comparisonSceneNumbers: pass.revisionTrace.comparisonSceneNumbers,
@@ -500,6 +528,8 @@ export class StorylabRunner {
     const iterations: StorylabRevisionLoopIteration[] = [];
     let latestWriterWorkingPath = writerResult.writerWorkingPath;
     let finalProsePath: string | null = null;
+    let continuityReportPath: string | null = null;
+    let continuityBlocking = false;
     let stopReason = "达到最大迭代次数仍未过线";
     let cachedBefore: PrecomputedRevisionState | null = null;
 
@@ -527,26 +557,52 @@ export class StorylabRunner {
 
         if (!pass.postRevisionGate.blocking) {
           this.report("gate", `第 ${iteration} 轮后所有 gate 已通过`, iteration);
-          finalProsePath = await this.store.writeFinalProse(bookId, pass.revisedDraft);
-          const settlementPaths = await this.settleAcceptedChapter(ctx, pass.revisedDraft, pass.afterAnalysis);
+          const finalized = await this.finalizeAcceptedChapter(ctx, pass.revisedDraft, pass.afterAnalysis);
+          finalProsePath = finalized.finalProsePath;
+          continuityReportPath = finalized.continuityReportPath;
+          continuityBlocking = finalized.continuityBlocking;
+          if (finalized.continuityBlocking) {
+            this.report("continuity", `第 ${iteration} 轮 continuity gate 阻止了 canonical persist`, iteration);
+            stopReason = `第 ${iteration} 轮 continuity gate 阻止了 canonical persist`;
+            return {
+              bookId,
+              chapterNumber: targetChapterNumber,
+              initialWriterWorkingPath: writerResult.writerWorkingPath,
+              latestWriterWorkingPath,
+              finalProsePath,
+              settlementPaths: finalized.settlementPaths,
+              continuityReportPath,
+              continuityBlocking,
+              passed: false,
+              iterations,
+              stopReason,
+              maxIterations,
+              writerProvider: this.writerAgent.name,
+              analysisProvider: this.analysisEngine.name,
+              readerProvider: this.readerEngine.name,
+              reviseProvider: this.reviseEngine.name,
+            };
+          }
           stopReason = `第 ${iteration} 轮后所有 gate 已通过`;
           return {
             bookId,
-          chapterNumber: targetChapterNumber,
-          initialWriterWorkingPath: writerResult.writerWorkingPath,
+            chapterNumber: targetChapterNumber,
+            initialWriterWorkingPath: writerResult.writerWorkingPath,
             latestWriterWorkingPath,
             finalProsePath,
-            settlementPaths,
+            settlementPaths: finalized.settlementPaths,
+            continuityReportPath,
+            continuityBlocking,
             passed: true,
             iterations,
-          stopReason,
-          maxIterations,
-          writerProvider: this.writerAgent.name,
-          analysisProvider: this.analysisEngine.name,
-          readerProvider: this.readerEngine.name,
-          reviseProvider: this.reviseEngine.name,
-        };
-      }
+            stopReason,
+            maxIterations,
+            writerProvider: this.writerAgent.name,
+            analysisProvider: this.analysisEngine.name,
+            readerProvider: this.readerEngine.name,
+            reviseProvider: this.reviseEngine.name,
+          };
+        }
 
       if (pass.revisionTrace.actualRewrittenSceneNumbers.length === 0) {
         this.report("gate", `第 ${iteration} 轮没有产生有效改写`, iteration);
@@ -586,15 +642,17 @@ export class StorylabRunner {
         latestWriterWorkingPath,
         finalProsePath,
         settlementPaths: null,
+        continuityReportPath,
+        continuityBlocking,
         passed: false,
         iterations,
-      stopReason,
-      maxIterations,
-      writerProvider: this.writerAgent.name,
-      analysisProvider: this.analysisEngine.name,
-      readerProvider: this.readerEngine.name,
-      reviseProvider: this.reviseEngine.name,
-    };
+        stopReason,
+        maxIterations,
+        writerProvider: this.writerAgent.name,
+        analysisProvider: this.analysisEngine.name,
+        readerProvider: this.readerEngine.name,
+        reviseProvider: this.reviseEngine.name,
+      };
   }
 
   private async loadRevisionPassContext(bookId: string, targetChapterNumber: number): Promise<RevisionPassContext> {
@@ -822,16 +880,6 @@ export class StorylabRunner {
       JSON.stringify(comparison, null, 2),
     );
 
-    await this.persistChapterAnalysis({
-      bookId: ctx.bookId,
-      book: ctx.book,
-      chapterNumber: ctx.chapterNumber,
-      analysis: afterAnalysis,
-      previousCharacterHistory: ctx.previousCharacterHistory,
-      previousThemeHistory: ctx.previousThemeHistory,
-      previousMemory: ctx.previousMemory,
-    });
-
     return {
       beforeAnalysis,
       beforeSceneAudit,
@@ -983,25 +1031,17 @@ export class StorylabRunner {
     ]);
   }
 
-  private async settleAcceptedChapter(
+  private async finalizeAcceptedChapter(
     ctx: RevisionPassContext,
     draft: ChapterDraft,
     analysis: ChapterAnalysisBundle,
-  ): Promise<SettlementOutputPaths> {
+  ): Promise<ContinuityFinalizeResult> {
     this.report("persist", `开始结算第 ${ctx.chapterNumber} 章最终正文`);
-    await this.persistChapterAnalysis({
-      bookId: ctx.bookId,
-      book: ctx.book,
-      chapterNumber: ctx.chapterNumber,
-      analysis,
-      previousCharacterHistory: ctx.previousCharacterHistory,
-      previousThemeHistory: ctx.previousThemeHistory,
-      previousMemory: ctx.previousMemory,
-    });
 
-    const [previousChronology, previousOpenLoops] = await Promise.all([
+    const [previousChronology, previousOpenLoops, worldRules] = await Promise.all([
       this.store.loadChronology(ctx.bookId),
       this.store.loadOpenLoops(ctx.bookId),
+      this.store.loadWorldRules(ctx.bookId),
     ]);
 
     const settlement = this.settlementAgent.settle({
@@ -1013,7 +1053,51 @@ export class StorylabRunner {
       previousOpenLoops,
     });
 
-    const [chapterSummaryPath, stateDeltaPath, chronologyPath, openLoopsPath] = await Promise.all([
+    this.report("continuity", `开始跨章连续性审计：第 ${ctx.chapterNumber} 章`);
+    const continuityReport = this.continuityAgent.audit({
+      chapterNumber: ctx.chapterNumber,
+      draft,
+      plan: ctx.plan,
+      analysis,
+      settlement,
+      previousChronology,
+      previousOpenLoops,
+      previousCharacterHistory: ctx.previousCharacterHistory,
+      worldRules,
+    });
+    const continuityReportPath = await this.store.writeOutput(
+      ctx.bookId,
+      "continuity",
+      this.store.chapterFileName(ctx.chapterNumber, "continuity-report.json"),
+      JSON.stringify(continuityReport, null, 2),
+    );
+    this.report("continuity", `continuity blocking=${continuityReport.blocking}`);
+    this.report("continuity", continuityReport.summary);
+
+    if (continuityReport.blocking) {
+      const continuityReasonSummary = continuityReport.issues
+        .map((issue) => `${issue.code}:${issue.message}`)
+        .join("; ");
+      this.report("continuity", `blocking reasons: ${continuityReasonSummary}`);
+      return {
+        continuityReportPath,
+        continuityBlocking: true,
+        settlementPaths: null,
+        finalProsePath: null,
+      };
+    }
+
+    await this.persistChapterAnalysis({
+      bookId: ctx.bookId,
+      book: ctx.book,
+      chapterNumber: ctx.chapterNumber,
+      analysis,
+      previousCharacterHistory: ctx.previousCharacterHistory,
+      previousThemeHistory: ctx.previousThemeHistory,
+      previousMemory: ctx.previousMemory,
+    });
+
+    const [chapterSummaryPath, stateDeltaPath, chronologyPath, openLoopsPath, finalProsePath] = await Promise.all([
       this.store.writeOutput(
         ctx.bookId,
         "settlement",
@@ -1038,14 +1122,20 @@ export class StorylabRunner {
         "open-loops.json",
         JSON.stringify(settlement.openLoops, null, 2),
       ),
+      this.store.writeFinalProse(ctx.bookId, draft),
     ]);
     this.report("persist", `第 ${ctx.chapterNumber} 章 settlement 已写回 summary/state-delta/chronology/open-loops`);
 
     return {
-      chapterSummaryPath,
-      stateDeltaPath,
-      chronologyPath,
-      openLoopsPath,
+      continuityReportPath,
+      continuityBlocking: false,
+      settlementPaths: {
+        chapterSummaryPath,
+        stateDeltaPath,
+        chronologyPath,
+        openLoopsPath,
+      },
+      finalProsePath,
     };
   }
 

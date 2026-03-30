@@ -8,8 +8,10 @@ import type {
   ChronologyLedger,
   OpenLoopEntry,
   OpenLoopsLedger,
+  SceneBlueprintItem,
   SettlementBundle,
 } from "../types.js";
+import { parseSceneDocument } from "../utils/scene-text.js";
 
 interface SettlementInput {
   readonly chapterNumber: number;
@@ -20,14 +22,18 @@ interface SettlementInput {
   readonly previousOpenLoops: OpenLoopsLedger;
 }
 
-const OPEN_LOOP_SIGNAL = /隐患|后果|威胁|秘密|疑问|悬念|记恨|危险|断供|未解决|必须进入下一章|真相|代价/u;
+const OPEN_LOOP_SIGNAL = /会|将|后续|下月|以后|下一章|必须|不得不|记恨|打压|断供|危险|真相|秘密|悬念|报复|安排|盯上|后果|隐患|威胁|追查/u;
 const CLOSE_SIGNAL = /解决|兑现|结束|了结|揭晓|落定|拿回|达成|关闭/u;
+const EVENT_SIGNAL = /夺回|反抗|出手|抢走|拿回|宣布|安排|记恨|断供|打压|发现|得知|接受|拒绝|逼迫|离开|反击|爆发|命令/u;
+const CONSEQUENCE_SIGNAL = /后续|下月|以后|下一章|记恨|打压|断供|危险|报复|安排|盯上|后果|隐患|威胁|践踏|失去/u;
+const META_NARRATIVE_SIGNAL = /本章|场景|真正推动这个场景|剧情动作|价值站队|立场压向|revision brief|gate|scene/iu;
+const IMMEDIATE_ACTION_SIGNAL = /揣入|捏住|撞得|挤了过来|看也没看|不躲不闪|侧面一偏/u;
 
 function uniqueStrings(values: ReadonlyArray<string>): ReadonlyArray<string> {
   return Array.from(new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)));
 }
 
-function trimSentence(text: string, maxLength = 80): string {
+function trimSentence(text: string, maxLength = 96): string {
   const normalized = text.replace(/\s+/gu, " ").trim();
   if (normalized.length <= maxLength) {
     return normalized;
@@ -36,19 +42,47 @@ function trimSentence(text: string, maxLength = 80): string {
   return `${normalized.slice(0, maxLength - 1).trim()}…`;
 }
 
-function pickLoopType(text: string): OpenLoopEntry["type"] {
-  if (/承诺|必须|约定/u.test(text)) return "promise";
-  if (/债|亏欠/u.test(text)) return "debt";
-  if (/威胁|危险|打压|记恨/u.test(text)) return "threat";
-  if (/秘密|真相|谜|未知/u.test(text)) return "mystery";
-  if (/问题|是否|能否|为什么/u.test(text)) return "question";
-  return "foreshadow";
+function trimClause(text: string, maxLength = 56): string {
+  return trimSentence(text, maxLength);
 }
 
-function pickUrgency(text: string): OpenLoopEntry["urgency"] {
-  if (/立刻|马上|必须|危险|断供|记恨/u.test(text)) return "high";
-  if (/很快|尽快|下一章|后续/u.test(text)) return "medium";
-  return "low";
+function normalizeLedgerPhrase(text: string): string {
+  return text
+    .replace(/^还是/u, "")
+    .replace(/，?林凡必须决定是继续低头$/u, "")
+    .replace(/^只要反抗，?/u, "")
+    .replace(/^\s*而/u, "")
+    .replace(/，?而变成必须做出的选择$/u, "")
+    .replace(/，?只要反抗$/u, "")
+    .replace(/，?一旦决定落地$/u, "")
+    .trim();
+}
+
+function stripSceneMarker(text: string): string {
+  return text.replace(/^【场景\s*\d+\s*\/\s*POV[:：][^\n】]+】\s*/u, "").trim();
+}
+
+function isMetadataParagraph(text: string): boolean {
+  return (
+    /^#\s+/u.test(text)
+    || /^---$/u.test(text)
+    || /^基于规划章节[:：]/u.test(text)
+    || /^摘要[:：]/u.test(text)
+  );
+}
+
+function splitIntoSentences(text: string): ReadonlyArray<string> {
+  return text
+    .split(/(?<=[。！？!?])\s+|\n+/u)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+}
+
+function splitIntoClauses(text: string): ReadonlyArray<string> {
+  return text
+    .split(/[，；：]/u)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length >= 4);
 }
 
 function extractKeywords(text: string): ReadonlyArray<string> {
@@ -57,31 +91,354 @@ function extractKeywords(text: string): ReadonlyArray<string> {
       .split(/[，。！？；、“”\s:：,.;!?()（）\-]+/u)
       .map((segment) => segment.trim())
       .filter((segment) => segment.length >= 2),
-  ).slice(0, 6);
+  ).slice(0, 8);
 }
 
-function buildChronologyInsertions(input: SettlementInput): ReadonlyArray<ChronologyEvent> {
-  return input.analysis.scenes.map((scene) => ({
-    eventId: `ch${String(input.chapterNumber).padStart(4, "0")}-scene-${scene.sceneNumber}`,
-    chapterNumber: input.chapterNumber,
-    sceneNumber: scene.sceneNumber,
-    sceneId: scene.sceneId,
-    actors: uniqueStrings(
+function pickLoopType(text: string): OpenLoopEntry["type"] {
+  if (/承诺|必须|约定/u.test(text)) return "promise";
+  if (/债|亏欠/u.test(text)) return "debt";
+  if (/威胁|危险|打压|记恨|断供|报复|盯上/u.test(text)) return "threat";
+  if (/秘密|真相|谜|未知/u.test(text)) return "mystery";
+  if (/问题|是否|能否|为什么/u.test(text)) return "question";
+  return "foreshadow";
+}
+
+function pickUrgency(text: string): OpenLoopEntry["urgency"] {
+  if (/立刻|马上|必须|危险|断供|记恨|报复|安排/u.test(text)) return "high";
+  if (/很快|尽快|下一章|后续|下月/u.test(text)) return "medium";
+  return "low";
+}
+
+function scoreCanonicalCandidate(text: string, kind: "event" | "consequence"): number {
+  const normalized = normalizeLedgerPhrase(text);
+  let score = 0;
+
+  if (kind === "event" && EVENT_SIGNAL.test(normalized)) score += 4;
+  if (kind === "consequence" && CONSEQUENCE_SIGNAL.test(normalized)) score += 4;
+  if (/抢走|夺回|反击|断供|安排|打压|记恨|灵石|危险/u.test(normalized)) score += 4;
+  if (kind === "event" && /默许|偏帮|抢走|羞辱/u.test(normalized)) score += 3;
+  if (/意识到|明白|知道|看见|感到/u.test(normalized)) score -= 2;
+  if (/必须决定|继续低头/u.test(normalized)) score -= 3;
+  if (kind === "consequence" && IMMEDIATE_ACTION_SIGNAL.test(normalized) && !CONSEQUENCE_SIGNAL.test(normalized)) score -= 4;
+  if (/偏帮有背景的弟子/u.test(normalized)) score -= 4;
+  if (normalized.length >= 8 && normalized.length <= 40) score += 2;
+
+  return score;
+}
+
+function extractDraftParagraphs(content: string): ReadonlyArray<string> {
+  return content
+    .split(/\n\s*\n/u)
+    .map((paragraph) => paragraph.replace(/\s+/gu, " ").trim())
+    .filter((paragraph) => paragraph.length > 0)
+    .filter((paragraph) => !isMetadataParagraph(paragraph));
+}
+
+function scoreParagraphForScene(
+  paragraph: string,
+  scene: ChapterAnalysisBundle["scenes"][number],
+  planScene: SceneBlueprintItem | undefined,
+): number {
+  const keywords = buildSceneKeywords(scene, planScene);
+  let score = 0;
+
+  score += keywords.filter((keyword) => paragraph.includes(keyword)).length * 2;
+  score += extractKeywords(scene.pov).filter((keyword) => paragraph.includes(keyword)).length * 2;
+
+  if (planScene) {
+    score += extractKeywords(
       [
-        scene.pov,
-        ...input.analysis.characterStates
-          .filter((character) => character.presentInChapter)
-          .map((character) => character.name)
-          .filter((name) => scene.sourceParagraphs.some((paragraph) => paragraph.includes(name))),
-      ],
-    ),
-    summary: trimSentence(`${scene.goal}；${scene.turn}；${scene.result}`),
-    consequence: trimSentence(scene.newInformation[0] ?? scene.emotionalShift ?? scene.result),
-  }));
+        planScene.drivingCharacter,
+        planScene.opposingForce,
+        ...planScene.newInformation,
+      ].join(" "),
+    ).filter((keyword) => paragraph.includes(keyword)).length * 2;
+  }
+
+  if (EVENT_SIGNAL.test(paragraph)) {
+    score += 2;
+  }
+  if (OPEN_LOOP_SIGNAL.test(paragraph)) {
+    score += 1;
+  }
+  if (META_NARRATIVE_SIGNAL.test(paragraph)) {
+    score -= 6;
+  }
+
+  return score;
+}
+
+function assignParagraphsToScenes(
+  paragraphs: ReadonlyArray<string>,
+  scenes: ReadonlyArray<ChapterAnalysisBundle["scenes"][number]>,
+  planScenes: ReadonlyArray<SceneBlueprintItem>,
+): ReadonlyArray<string> {
+  if (scenes.length === 0 || paragraphs.length === 0) {
+    return [];
+  }
+
+  const buckets = Array.from({ length: scenes.length }, () => [] as string[]);
+  let sceneIndex = 0;
+
+  for (const paragraph of paragraphs) {
+    while (sceneIndex < scenes.length - 1) {
+      const currentScene = scenes[sceneIndex];
+      const nextScene = scenes[sceneIndex + 1];
+      const currentPlan = planScenes.find((item) => item.sceneNumber === currentScene.sceneNumber);
+      const nextPlan = planScenes.find((item) => item.sceneNumber === nextScene.sceneNumber);
+      const currentScore = scoreParagraphForScene(paragraph, currentScene, currentPlan);
+      const nextScore = scoreParagraphForScene(paragraph, nextScene, nextPlan);
+      const currentHasContent = buckets[sceneIndex].length > 0;
+
+      if (currentHasContent && nextScore >= currentScore + 2) {
+        sceneIndex += 1;
+        continue;
+      }
+
+      break;
+    }
+
+    buckets[sceneIndex].push(paragraph);
+  }
+
+  return buckets.map((bucket) => bucket.join("\n").trim());
+}
+
+function buildSceneEvidenceMap(input: SettlementInput): ReadonlyMap<number, string> {
+  const fromDraft = parseSceneDocument(input.draft.content);
+  const map = new Map<number, string>();
+
+  for (const scene of fromDraft.scenes) {
+    map.set(scene.sceneNumber, stripSceneMarker(scene.content));
+  }
+
+  if (fromDraft.scenes.length === 0 && input.analysis.scenes.length > 0) {
+    const draftParagraphs = extractDraftParagraphs(input.draft.content);
+    const chunkedEvidence = assignParagraphsToScenes(draftParagraphs, input.analysis.scenes, input.plan.sceneBlueprint);
+
+    input.analysis.scenes.forEach((scene, index) => {
+      const chunk = chunkedEvidence[index];
+      if (chunk && chunk.length > 0) {
+        map.set(scene.sceneNumber, chunk);
+      }
+    });
+  }
+
+  for (const scene of input.analysis.scenes) {
+    if (!map.has(scene.sceneNumber)) {
+      map.set(scene.sceneNumber, scene.sourceParagraphs.join("\n").trim());
+    }
+  }
+
+  return map;
+}
+
+function buildSceneKeywords(scene: ChapterAnalysisBundle["scenes"][number], planScene: SceneBlueprintItem | undefined): ReadonlyArray<string> {
+  return extractKeywords([
+    scene.goal,
+    scene.conflict,
+    scene.turn,
+    scene.result,
+    ...(scene.newInformation ?? []),
+    planScene?.decision ?? "",
+    planScene?.cost ?? "",
+    planScene?.result ?? "",
+    planScene?.thematicTension ?? "",
+  ].join(" "));
+}
+
+function buildSceneActors(
+  scene: ChapterAnalysisBundle["scenes"][number],
+  planScene: SceneBlueprintItem | undefined,
+  characterStates: ReadonlyArray<ChapterAnalysisBundle["characterStates"][number]>,
+): ReadonlyArray<string> {
+  const sceneText = [
+    planScene?.drivingCharacter ?? "",
+    planScene?.opposingForce ?? "",
+    planScene?.relationshipChange ?? "",
+    planScene?.decision ?? "",
+    planScene?.cost ?? "",
+    ...(planScene?.newInformation ?? []),
+  ].join(" ");
+
+  return uniqueStrings([
+    scene.pov,
+    planScene?.drivingCharacter ?? "",
+    ...characterStates
+      .map((character) => character.name)
+      .filter((name) => sceneText.includes(name)),
+  ]);
+}
+
+function scoreSentence(sentence: string, keywords: ReadonlyArray<string>, actors: ReadonlyArray<string>, kind: "event" | "consequence"): number {
+  let score = 0;
+  const overlap = keywords.filter((keyword) => sentence.includes(keyword)).length;
+  score += overlap * 2;
+  score += actors.filter((actor) => sentence.includes(actor)).length * 2;
+  if (kind === "event" && EVENT_SIGNAL.test(sentence)) score += 4;
+  if (kind === "consequence" && OPEN_LOOP_SIGNAL.test(sentence)) score += 4;
+  if (kind === "event" && /会|将|后续|以后|下一章/u.test(sentence)) score -= 3;
+  if (/“|”|「|」/u.test(sentence)) score -= kind === "event" ? 4 : 2;
+  if (/^“/u.test(sentence)) score -= 3;
+  if (sentence.length >= 10 && sentence.length <= 60) score += 2;
+  if (/推进当前悬念|场景结束时获得有限推进|场景以内压推进|场景中段出现逆转/u.test(sentence)) score -= 6;
+  if (META_NARRATIVE_SIGNAL.test(sentence)) score -= 6;
+  return score;
+}
+
+function pickBestSentence(
+  evidence: string,
+  keywords: ReadonlyArray<string>,
+  actors: ReadonlyArray<string>,
+  kind: "event" | "consequence",
+): string | null {
+  const sentences = splitIntoSentences(evidence);
+  if (sentences.length === 0) {
+    return null;
+  }
+
+  const ranked = sentences
+    .map((sentence) => ({ sentence, score: scoreSentence(sentence, keywords, actors, kind) }))
+    .sort((left, right) => right.score - left.score);
+
+  const best = ranked[0];
+  if (!best || best.score < 4) {
+    return null;
+  }
+
+  return trimSentence(best.sentence);
+}
+
+function chooseCanonicalEventText(
+  kind: "event" | "consequence",
+  proseCandidate: string | null,
+  fallbackCandidates: ReadonlyArray<string>,
+): string {
+  const ranked = uniqueStrings([
+    ...fallbackCandidates,
+    ...(proseCandidate ? [proseCandidate] : []),
+  ])
+    .map((candidate) => ({
+      candidate,
+      normalized: normalizeLedgerPhrase(candidate),
+      score: scoreCanonicalCandidate(candidate, kind),
+    }))
+    .sort((left, right) => right.score - left.score);
+
+  const best = ranked[0];
+  return trimSentence(best?.normalized || fallbackCandidates[0] || proseCandidate || "", kind === "event" ? 48 : 56);
+}
+
+function compactLedgerSentence(
+  sentence: string,
+  keywords: ReadonlyArray<string>,
+  actors: ReadonlyArray<string>,
+  kind: "event" | "consequence",
+): string {
+  const clauses = splitIntoClauses(sentence);
+  if (clauses.length === 0) {
+    return trimClause(sentence);
+  }
+
+  const ranked = clauses
+    .map((clause) => ({ clause, score: scoreSentence(clause, keywords, actors, kind) }))
+    .sort((left, right) => right.score - left.score);
+
+  const picked: string[] = [];
+  for (const item of ranked) {
+    if (item.score <= 0) {
+      continue;
+    }
+    if (picked.length === 0) {
+      picked.push(item.clause);
+      continue;
+    }
+    if (!picked.some((existing) => existing.includes(item.clause) || item.clause.includes(existing))) {
+      picked.push(item.clause);
+    }
+    if (picked.length >= 2) {
+      break;
+    }
+  }
+
+  if (picked.length === 0) {
+    return trimClause(sentence);
+  }
+
+  if (kind === "consequence" && actors.length > 0 && !picked.some((clause) => actors.some((actor) => clause.includes(actor)))) {
+    const actorClause = ranked.find((item) => item.score > 0 && actors.some((actor) => item.clause.includes(actor)));
+    if (actorClause && !picked.some((existing) => existing.includes(actorClause.clause) || actorClause.clause.includes(existing))) {
+      picked.unshift(actorClause.clause);
+    }
+  }
+
+  const ordered = picked
+    .slice()
+    .sort((left, right) => sentence.indexOf(left) - sentence.indexOf(right));
+
+  return trimClause(ordered.join("，"), kind === "event" ? 48 : 56);
+}
+
+function buildChronologyInsertions(
+  input: SettlementInput,
+  sceneEvidenceMap: ReadonlyMap<number, string>,
+): ReadonlyArray<ChronologyEvent> {
+  return input.analysis.scenes.map((scene) => {
+    const planScene = input.plan.sceneBlueprint.find((item) => item.sceneNumber === scene.sceneNumber);
+    const evidence = sceneEvidenceMap.get(scene.sceneNumber) ?? scene.sourceParagraphs.join("\n");
+    const actors = buildSceneActors(scene, planScene, input.analysis.characterStates.filter((character) => character.presentInChapter));
+    const keywords = buildSceneKeywords(scene, planScene);
+
+    const proseSummary = pickBestSentence(evidence, keywords, actors, "event");
+    const proseConsequence = pickBestSentence(evidence, buildSceneKeywords(scene, planScene), actors, "consequence");
+
+    const summary = chooseCanonicalEventText("event", proseSummary, [
+      planScene?.conflict ?? "",
+      planScene?.turn ?? "",
+      planScene?.decision ?? "",
+      planScene?.result ?? "",
+      scene.result,
+      scene.goal,
+    ]);
+    const consequence = chooseCanonicalEventText("consequence", proseConsequence, [
+      planScene?.cost ?? "",
+      planScene?.result ?? "",
+      planScene?.newInformation[0] ?? "",
+      scene.result,
+      scene.emotionalShift,
+    ]);
+
+    return {
+      eventId: `ch${String(input.chapterNumber).padStart(4, "0")}-scene-${scene.sceneNumber}`,
+      chapterNumber: input.chapterNumber,
+      sceneNumber: scene.sceneNumber,
+      sceneId: scene.sceneId,
+      actors,
+      summary: compactLedgerSentence(normalizeLedgerPhrase(summary), keywords, actors, "event"),
+      consequence: compactLedgerSentence(normalizeLedgerPhrase(consequence), keywords, actors, "consequence"),
+    } satisfies ChronologyEvent;
+  });
 }
 
 function buildKeyEvents(events: ReadonlyArray<ChronologyEvent>): ReadonlyArray<string> {
-  return events.map((event) => trimSentence(event.summary, 64));
+  return events.map((event) => trimSentence(`${event.summary} -> ${event.consequence}`, 72));
+}
+
+function buildChapterNarrativeSummary(
+  input: SettlementInput,
+  chronologyInsertions: ReadonlyArray<ChronologyEvent>,
+): string {
+  const firstEvent = chronologyInsertions[0];
+  const lastEvent = chronologyInsertions.at(-1);
+
+  if (!firstEvent || !lastEvent) {
+    return trimSentence(input.plan.chapterMission, 108);
+  }
+
+  return trimSentence(
+    `${firstEvent.summary}，${lastEvent.consequence}`,
+    108,
+  );
 }
 
 function matchLoop(loop: OpenLoopEntry, chapterSignals: string): { matched: boolean; shouldClose: boolean } {
@@ -97,30 +454,92 @@ function matchLoop(loop: OpenLoopEntry, chapterSignals: string): { matched: bool
   };
 }
 
-function buildChapterSignals(input: SettlementInput): string {
+function buildChapterSignals(input: SettlementInput, chronologyInsertions: ReadonlyArray<ChronologyEvent>): string {
   return [
     input.draft.content,
     input.analysis.readerReport.summary,
     ...input.analysis.readerReport.risks,
-    ...input.analysis.scenes.flatMap((scene) => [scene.goal, scene.conflict, scene.turn, scene.result, ...scene.newInformation]),
+    ...input.analysis.characterStates.map((state) => state.decisionCost),
+    ...chronologyInsertions.flatMap((event) => [event.summary, event.consequence]),
+    ...input.plan.sceneBlueprint.flatMap((scene) => [scene.decision, scene.cost, scene.result, ...scene.newInformation]),
   ]
     .join("\n")
     .replace(/\s+/gu, " ")
     .trim();
 }
 
-function createNewLoopCandidates(input: SettlementInput, existingLoops: ReadonlyArray<OpenLoopEntry>): ReadonlyArray<OpenLoopEntry> {
-  const sources = uniqueStrings([
+function collectLoopSources(
+  input: SettlementInput,
+  chronologyInsertions: ReadonlyArray<ChronologyEvent>,
+): ReadonlyArray<string> {
+  const draftSentences = splitIntoSentences(input.draft.content).filter((sentence) => !/“|”|「|」/u.test(sentence));
+  const chronologyConsequences = chronologyInsertions.map((event) => event.consequence);
+  const characterCosts = input.analysis.characterStates
+    .filter((state) => state.presentInChapter)
+    .map((state) => state.decisionCost);
+  const planCosts = input.plan.sceneBlueprint.flatMap((scene) => [
+    scene.cost,
+    ...scene.newInformation,
+    OPEN_LOOP_SIGNAL.test(scene.result) ? scene.result : "",
+  ]);
+
+  const characterNames = input.analysis.characterStates.map((state) => state.name);
+
+  const ranked = uniqueStrings([
     ...input.analysis.readerReport.risks,
-    ...input.analysis.scenes.flatMap((scene) => [
-      scene.turn,
-      scene.result,
-      ...scene.newInformation,
-    ]),
+    ...characterCosts,
+    ...planCosts,
+    ...chronologyConsequences,
+    ...draftSentences.filter((sentence) => OPEN_LOOP_SIGNAL.test(sentence)),
   ])
     .filter((text) => OPEN_LOOP_SIGNAL.test(text))
-    .slice(0, 3);
+    .filter((text) => !/推进当前悬念|场景结束时获得有限推进|场景以内压推进|场景中段出现逆转/u.test(text))
+    .filter((text) => !/一旦决定落地/u.test(text))
+    .filter((text) => !META_NARRATIVE_SIGNAL.test(text))
+      .map((text) => {
+        let score = 0;
+        if (/记恨|断供|报复|危险|安排|真相|秘密/u.test(text)) score += 4;
+        if (/后续|以后|下月|下一章|会|将/u.test(text)) score += 3;
+        if (characterNames.some((name) => text.includes(name))) score += 2;
+        if (/偏帮有背景的弟子/u.test(text)) score -= 5;
+        if (/只要反抗/u.test(text)) score -= 2;
+        if (text.length >= 12 && text.length <= 72) score += 2;
+        return { text, score };
+      })
+      .sort((left, right) => right.score - left.score)
+      .reduce<Array<{ text: string; keywords: ReadonlyArray<string> }>>((selected, item) => {
+        if (selected.length >= 2) {
+          return selected;
+        }
 
+        const keywords = extractKeywords(item.text);
+        if (/偏帮有背景的弟子/u.test(item.text) && selected.length >= 1) {
+          return selected;
+        }
+        const overlapsExisting = selected.some((existing) => {
+          const overlap = keywords.filter((keyword) => existing.keywords.includes(keyword)).length;
+          return overlap >= Math.min(2, keywords.length) && overlap > 0;
+      });
+      if (overlapsExisting) {
+        return selected;
+      }
+
+      selected.push({ text: item.text, keywords });
+      return selected;
+    }, [])
+    .map((item) => item.text);
+
+  return ranked;
+}
+
+function createNewLoopCandidates(
+  input: SettlementInput,
+  existingLoops: ReadonlyArray<OpenLoopEntry>,
+  chronologyInsertions: ReadonlyArray<ChronologyEvent>,
+): ReadonlyArray<OpenLoopEntry> {
+  const sources = collectLoopSources(input, chronologyInsertions).filter((source, index, all) => (
+    !all.some((other, otherIndex) => otherIndex !== index && other.includes(source))
+  ));
   const existingDescriptions = existingLoops.map((loop) => loop.description);
   const nextIndexBase = existingLoops.filter((loop) => loop.introducedInChapter === input.chapterNumber).length;
 
@@ -132,22 +551,35 @@ function createNewLoopCandidates(input: SettlementInput, existingLoops: Readonly
           .filter((character) => source.includes(character.name))
           .map((character) => character.name),
       );
-      const owner = relatedEntities[0] ?? input.analysis.scenes[0]?.pov ?? "章节系统";
+      const sourceKeywords = extractKeywords(source);
+      const matchingEvent = chronologyInsertions
+        .map((event) => {
+          let score = 0;
+          if (event.summary.includes(source) || source.includes(event.summary)) score += 5;
+          if (event.consequence.includes(source) || source.includes(event.consequence)) score += 5;
+          score += relatedEntities.filter((entity) => event.actors.includes(entity)).length;
+          score += sourceKeywords.filter((keyword) => (
+            event.summary.includes(keyword) || event.consequence.includes(keyword)
+          )).length;
+          return { event, score };
+        })
+        .sort((left, right) => right.score - left.score)[0]?.event;
+      const owner = relatedEntities[0] ?? matchingEvent?.actors[0] ?? input.analysis.scenes[0]?.pov ?? "章节系统";
 
       return {
         loopId: `loop-ch${String(input.chapterNumber).padStart(4, "0")}-${String(nextIndexBase + index + 1).padStart(2, "0")}`,
         type: pickLoopType(source),
         introducedInChapter: input.chapterNumber,
         owner,
-        description: trimSentence(source, 96),
-        expectedPayoffWindow: "soon",
+        description: compactLedgerSentence(source, sourceKeywords, relatedEntities, "consequence"),
+        expectedPayoffWindow: pickUrgency(source) === "high" ? "soon" : "mid",
         urgency: pickUrgency(source),
         status: "open",
         payoffConstraints: [
           "后续章节必须继续承接这条未兑现事项",
         ],
         relatedEntities,
-        evidenceRefs: input.analysis.scenes.map((scene) => `scene-${scene.sceneNumber}`),
+        evidenceRefs: matchingEvent ? [`scene-${matchingEvent.sceneNumber}`] : input.analysis.scenes.map((scene) => `scene-${scene.sceneNumber}`),
         lastUpdatedChapter: input.chapterNumber,
       } satisfies OpenLoopEntry;
     });
@@ -166,12 +598,13 @@ function summarizeChangedCharacters(input: SettlementInput): ChapterSummaryRecor
 
 export class SettlementAgent {
   settle(input: SettlementInput): SettlementBundle {
-    const chronologyInsertions = buildChronologyInsertions(input);
+    const sceneEvidenceMap = buildSceneEvidenceMap(input);
+    const chronologyInsertions = buildChronologyInsertions(input, sceneEvidenceMap);
     const nextChronology: ChronologyLedger = {
       events: [...input.previousChronology.events, ...chronologyInsertions],
     };
 
-    const chapterSignals = buildChapterSignals(input);
+    const chapterSignals = buildChapterSignals(input, chronologyInsertions);
     const loopUpdates: Array<ChapterStateDelta["updatedLoops"][number]> = [];
     const updatedExistingLoops = input.previousOpenLoops.loops.map((loop) => {
       const match = matchLoop(loop, chapterSignals);
@@ -194,7 +627,7 @@ export class SettlementAgent {
       } satisfies OpenLoopEntry;
     });
 
-    const newLoops = createNewLoopCandidates(input, updatedExistingLoops);
+    const newLoops = createNewLoopCandidates(input, updatedExistingLoops, chronologyInsertions);
     loopUpdates.push(
       ...newLoops.map((loop) => ({
         loopId: loop.loopId,
@@ -213,13 +646,11 @@ export class SettlementAgent {
     const closedLoopIds = loopUpdates.filter((loop) => loop.action === "closed").map((loop) => loop.loopId);
     const changedCharacters = summarizeChangedCharacters(input);
 
+    const finalEvent = chronologyInsertions.at(-1);
     const chapterSummary: ChapterSummaryRecord = {
       chapterNumber: input.chapterNumber,
       title: input.draft.title,
-      summary: trimSentence(
-        `${input.plan.chapterMission} 本章推进了 ${input.analysis.scenes.length} 个场景，核心结果是 ${input.analysis.scenes[input.analysis.scenes.length - 1]?.result ?? "角色被推入下一轮冲突"}。`,
-        120,
-      ),
+      summary: buildChapterNarrativeSummary(input, chronologyInsertions),
       keyEvents: buildKeyEvents(chronologyInsertions),
       changedCharacters,
       openedLoopIds,

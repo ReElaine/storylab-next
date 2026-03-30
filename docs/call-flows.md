@@ -45,15 +45,20 @@ node dist/index.js plan-next <workspaceDir> <bookId> <targetChapterNumber>
 - `character-history.json`
 - `theme-history.json`
 - `story-memory.json`
+- `story/settlement/*.chapter-summary.json`
+- `story/plot/chronology.json`
+- `story/plot/open-loops.json`
 - `style-guide.json`
 - `gates.json`
 
 调用：
 
+- `ContextAssembler`
 - `planning engine`
 
 写回：
 
+- `story/context/chapter-XXXX.context-pack.json`
 - `story/planning/chapter-XXXX.chapter-plan.json`
 
 ## 3. `write-from-plan`
@@ -65,6 +70,7 @@ node dist/index.js write-from-plan <workspaceDir> <bookId> <targetChapterNumber>
 读取：
 
 - `chapter-plan.json`
+- `context-pack.json`
 - `character-history.json`
 - `theme-history.json`
 
@@ -116,8 +122,11 @@ node dist/index.js revise-cycle <workspaceDir> <bookId> <targetChapterNumber> [-
 6. `re-analysis`
 7. `re-reader`
 8. `comparison`
-9. `persist`
-10. `postRevisionGate`
+9. `postRevisionGate`
+10. `settlement`
+11. `continuity audit`
+12. `persist canonical state`
+13. `final prose export`
 
 写回：
 
@@ -128,12 +137,14 @@ node dist/index.js revise-cycle <workspaceDir> <bookId> <targetChapterNumber> [-
 
 最终正文：
 
-- 只有 `postRevisionGate` 通过时，才写 `final/*.txt`
-- 写出 `final/*.txt` 后，会继续执行 settlement：
-  - `chapter-summary`
-  - `chapter-state-delta`
-  - `chronology`
-  - `open-loops`
+- 只有 `postRevisionGate` 与 `continuity audit` 都通过时，才写 `final/*.txt`
+- `continuity_report` 会先落盘
+- 只有 continuity 通过后，才会继续：
+  - 写 canonical `chapter-summary`
+  - 写 canonical `chapter-state-delta`
+  - 更新 `chronology`
+  - 更新 `open-loops`
+  - 导出 `final/*.txt`
 
 ## 6. `revise-until-pass`
 
@@ -151,6 +162,8 @@ node dist/index.js revise-until-pass <workspaceDir> <bookId> <targetChapterNumbe
 6. `re-analysis`
 7. `re-reader`
 8. `comparison`
+9. `settlement`
+10. `continuity audit`
 
 说明：
 
@@ -178,6 +191,7 @@ reader 优先规则：
 
 通过后的额外持久化：
 
+- `books/<bookId>/story/continuity/chapter-XXXX.continuity-report.json`
 - `books/<bookId>/story/settlement/chapter-XXXX.chapter-summary.json`
 - `books/<bookId>/story/settlement/chapter-XXXX.chapter-state-delta.json`
 - `books/<bookId>/story/plot/chronology.json`

@@ -161,6 +161,19 @@ export interface StoryMemory {
   };
 }
 
+export interface WorldRuleEntry {
+  readonly ruleId: string;
+  readonly description: string;
+  readonly severity: "medium" | "high";
+  readonly forbiddenPhrases: ReadonlyArray<string>;
+  readonly appliesWhenAnyPhrases: ReadonlyArray<string>;
+  readonly requiredPhrases: ReadonlyArray<string>;
+}
+
+export interface WorldRulesConfig {
+  readonly rules: ReadonlyArray<WorldRuleEntry>;
+}
+
 export interface ChapterSummaryRecord {
   readonly chapterNumber: number;
   readonly title: string;
@@ -175,6 +188,13 @@ export interface ChapterSummaryRecord {
   readonly openedLoopIds: ReadonlyArray<string>;
   readonly advancedLoopIds: ReadonlyArray<string>;
   readonly closedLoopIds: ReadonlyArray<string>;
+}
+
+export interface BookPhaseState {
+  readonly phaseKey: "opening" | "early-rise" | "mid-escalation" | "late-crisis" | "endgame";
+  readonly label: string;
+  readonly rationale: string;
+  readonly tensionGoal: string;
 }
 
 export interface ChronologyEvent {
@@ -244,6 +264,44 @@ export interface SettlementOutputPaths {
   readonly openLoopsPath: string;
 }
 
+export interface ContinuityIssue {
+  readonly code:
+    | "timeline_conflict"
+    | "scene_coverage_conflict"
+    | "character_state_conflict"
+    | "open_loop_conflict"
+    | "world_rule_conflict"
+    | "world_rule_check_skipped";
+  readonly severity: "low" | "medium" | "high";
+  readonly scope: "chapter" | "scene" | "state";
+  readonly sceneNumber: number | null;
+  readonly refs: ReadonlyArray<string>;
+  readonly message: string;
+  readonly recommendation: string;
+}
+
+export interface ContinuityReport {
+  readonly chapterNumber: number;
+  readonly blocking: boolean;
+  readonly summary: string;
+  readonly issues: ReadonlyArray<ContinuityIssue>;
+  readonly checkedCounts: {
+    readonly previousChronologyEvents: number;
+    readonly previousOpenLoops: number;
+    readonly trackedCharacters: number;
+    readonly chronologyInsertions: number;
+    readonly worldRules: number;
+  };
+  readonly skippedChecks: ReadonlyArray<"world_rules">;
+}
+
+export interface ContinuityFinalizeResult {
+  readonly continuityReportPath: string | null;
+  readonly continuityBlocking: boolean;
+  readonly settlementPaths: SettlementOutputPaths | null;
+  readonly finalProsePath: string | null;
+}
+
 export interface SceneBlueprintItem {
   readonly sceneId: string;
   readonly sceneAnchor: string;
@@ -283,6 +341,27 @@ export interface ChapterPlan {
   readonly gateNote: string;
 }
 
+export interface ContextPack {
+  readonly taskType: "plan-next" | "writer";
+  readonly targetChapterNumber: number;
+  readonly currentBookPhase: BookPhaseState;
+  readonly recentChapterSummaries: ReadonlyArray<ChapterSummaryRecord>;
+  readonly activeOpenLoops: ReadonlyArray<OpenLoopEntry>;
+  readonly chronologySlice: ReadonlyArray<ChronologyEvent>;
+  readonly relevantCharacterStates: ReadonlyArray<{
+    readonly name: string;
+    readonly currentDesire: string;
+    readonly currentFear: string;
+    readonly currentMisbelief: string;
+    readonly recentDecision: string;
+    readonly decisionCost: string;
+    readonly arcProgress: string;
+    readonly relationshipShift: ReadonlyArray<string>;
+  }>;
+  readonly carryForwardFacts: ReadonlyArray<string>;
+  readonly planningFocus: ReadonlyArray<string>;
+}
+
 export interface ChapterDraft {
   readonly chapterNumber: number;
   readonly title: string;
@@ -316,6 +395,7 @@ export interface StorylabPlanResult {
   readonly bookId: string;
   readonly targetChapterNumber: number;
   readonly outputPath: string;
+  readonly contextPackPath?: string;
   readonly provider: string;
 }
 
@@ -527,6 +607,8 @@ export interface StorylabRevisionCycleResult {
   readonly postRevisionGate: BlockingGateStatus;
   readonly finalProsePath: string | null;
   readonly settlementPaths: SettlementOutputPaths | null;
+  readonly continuityReportPath: string | null;
+  readonly continuityBlocking: boolean;
   readonly targetSceneNumbers: ReadonlyArray<number>;
   readonly actualRewrittenSceneNumbers: ReadonlyArray<number>;
   readonly comparisonSceneNumbers: ReadonlyArray<number>;
@@ -568,6 +650,8 @@ export interface StorylabRevisionLoopResult {
   readonly latestWriterWorkingPath: string;
   readonly finalProsePath: string | null;
   readonly settlementPaths: SettlementOutputPaths | null;
+  readonly continuityReportPath: string | null;
+  readonly continuityBlocking: boolean;
   readonly passed: boolean;
   readonly iterations: ReadonlyArray<StorylabRevisionLoopIteration>;
   readonly stopReason: string;

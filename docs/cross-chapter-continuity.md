@@ -210,11 +210,16 @@
 
 #### 4. 运行时上下文层还没独立
 
-现在有 prompt 拼装思想，但还没有正式的：
+现在已经开始落地，但还只是初版：
 
-- `context assembler`
-- `context_pack`
+- 已有 `context assembler`
+- 已有 `context_pack`
+- `plan-next` 与 writer 已开始读同一份上下文包
+
+仍然缺少的部分：
+
 - 按 agent 区分的上下文切片规则
+- 更细粒度的 runtime pack 裁剪与缓存策略
 
 #### 5. 状态结算流才刚起步
 
@@ -309,18 +314,30 @@ Phase 1 仍然只是“有账可记”的版本，还不是完整全书账本：
 
 #### 2. 推进 Phase 2：State-Driven Planning
 
-优先新增：
+当前已完成初版：
 
 - `context assembler`
 - `context_pack.json`
 
-并让 planner 明确读取：
+当前已经做到：
+
+- `plan-next` 在规划前会先组装 `context-pack`
+- planner 通过 `context-pack` 读取状态，而不是直接拼散装历史
+- writer 也开始消费同一份 `context-pack`
+
+接下来要继续做强的是：
 
 - recent chapter summaries
 - chronology
 - open loops
 - core character current state
 - current book phase（初版可先 heuristic）
+
+下一步仍需要补：
+
+- 更稳定的 `book phase` 维护
+- 更明确的 `carry-forward facts / forbidden contradictions`
+- 面向不同 agent 的专用 context slice
 
 #### 3. 规划 Phase 3：Continuity Audit
 
@@ -330,6 +347,19 @@ Phase 1 仍然只是“有账可记”的版本，还不是完整全书账本：
 - world rules 冲突
 - 人物状态 / 人设冲突
 - open loop / reveal 冲突
+
+当前已经落地的最小版：
+
+- `ContinuityAgent`
+- `story/continuity/chapter-XXXX.continuity-report.json`
+- `finalizeAcceptedChapter` 现在会先 `settlement -> continuity audit`
+- continuity fail 时只写 `continuity_report`，不会继续写 canonical `summary / delta / chronology / open-loops`
+- `final prose` 也会因为 continuity fail 被拦下，不会导出到 `final/*.txt`
+
+当前这版仍然是最小实现，主要作用是先把 continuity gate 建起来，而不是一次性做完整世界规则检查：
+
+- 已接入：scene coverage、timeline、open loop continuity、已跟踪角色状态连续性、最小版 `world-rules.json` 禁用表达 / 必要规则信号检查
+- 暂时未做：更强的 `world_rules` 语义推理与例外规则解释
 
 ### P1：紧接着做
 

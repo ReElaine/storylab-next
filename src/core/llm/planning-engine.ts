@@ -1,10 +1,8 @@
 import type {
   ChapterPlan,
-  ChapterSummaryRecord,
   CharacterHistory,
-  ChronologyLedger,
+  ContextPack,
   HumanGate,
-  OpenLoopsLedger,
   StoryMemory,
   StyleGuide,
   ThemeHistory,
@@ -15,11 +13,9 @@ import { createChatCompletionWithRetry, createOpenAIClient, extractJsonObject, r
 export interface PlanningInput {
   readonly targetChapterNumber: number;
   readonly characterHistory: ReadonlyArray<CharacterHistory>;
+  readonly contextPack: ContextPack;
   readonly themeHistory: ThemeHistory;
   readonly memory: StoryMemory;
-  readonly chapterSummaries: ReadonlyArray<ChapterSummaryRecord>;
-  readonly chronology: ChronologyLedger;
-  readonly openLoops: OpenLoopsLedger;
   readonly gates: ReadonlyArray<HumanGate>;
   readonly styleGuide: StyleGuide;
 }
@@ -39,9 +35,9 @@ export class HeuristicPlanningEngine implements PlanningEngine {
       input.characterHistory,
       input.themeHistory,
       input.memory,
-      input.chapterSummaries,
-      input.chronology,
-      input.openLoops,
+      input.contextPack.recentChapterSummaries,
+      { events: input.contextPack.chronologySlice },
+      { loops: input.contextPack.activeOpenLoops },
       input.gates,
       input.styleGuide,
     );
@@ -75,23 +71,14 @@ export class OpenAIPlanningEngine implements PlanningEngine {
           role: "user",
           content: [
             `目标章节: ${input.targetChapterNumber}`,
-            "人物历史：",
-            JSON.stringify(input.characterHistory, null, 2),
+            "context pack：",
+            JSON.stringify(input.contextPack, null, 2),
             "",
             "主题历史：",
             JSON.stringify(input.themeHistory, null, 2),
             "",
             "story memory：",
             JSON.stringify(input.memory, null, 2),
-            "",
-            "recent chapter summaries：",
-            JSON.stringify(input.chapterSummaries, null, 2),
-            "",
-            "chronology：",
-            JSON.stringify(input.chronology, null, 2),
-            "",
-            "open loops：",
-            JSON.stringify(input.openLoops, null, 2),
             "",
             "human gates：",
             JSON.stringify(input.gates, null, 2),

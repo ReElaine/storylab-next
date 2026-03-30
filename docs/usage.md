@@ -41,6 +41,12 @@ node dist/index.js run ./demo-workspace ember-fall 1
 node dist/index.js plan-next ./demo-workspace ember-fall 2
 ```
 
+说明：
+
+- 会同时生成 `chapter-plan.json`
+- 也会生成 `context-pack.json`
+- `context-pack` 是 `Phase 2` 初版运行时上下文包，供 planner 与 writer 共用最近章节摘要、chronology slice、active open loops、角色当前状态和当前书稿阶段
+
 ### 4. 根据计划生成 writer 工作稿
 
 ```bash
@@ -99,7 +105,8 @@ node dist/index.js revise-until-pass ./demo-workspace ember-fall 2 --override --
 - 每轮都会读取 reader 建议继续修
 - 整条链按串行执行，不并行触发多个 LLM agent
 - 如果当前版本已经通过 gate，会直接停止并导出最终正文
-- 只有当 reader 过线且不存在硬结构阻断时，才导出 `final/*.txt`
+- 只有当 reader 过线且不存在硬结构阻断时，才会继续进入 `settlement -> continuity audit -> persist canonical state -> final prose export`
+- 只有 `continuity audit` 也通过时，才导出 `final/*.txt`
 - 如果达到最大轮次、没有实际改写、或连续一轮没有有效提升，则停止
 - CLI 的进度、retry、reader 分数和建议输出在 `stderr`，JSON 结果输出在 `stdout`
 
@@ -160,6 +167,17 @@ $env:STORYLAB_OPENAI_BASE_URL="https://your-compatible-endpoint/v1"
 - `books/<bookId>/story/settlement/chapter-XXXX.chapter-state-delta.json`
 - `books/<bookId>/story/plot/chronology.json`
 - `books/<bookId>/story/plot/open-loops.json`
+- `books/<bookId>/story/continuity/chapter-XXXX.continuity-report.json`
+
+### 可选 world rules
+
+- `books/<bookId>/story/canon/world-rules.json`
+
+说明：
+
+- 如果存在该文件，continuity audit 会额外检查：
+  - 禁用表达是否出现在正文 / settlement 信号里
+  - 某些规则在触发条件成立时，是否出现必须承接的规则信号
 
 导出条件：
 
@@ -174,7 +192,8 @@ $env:STORYLAB_OPENAI_BASE_URL="https://your-compatible-endpoint/v1"
 
 - 如果 reader 已过线，但 `scene audit` 只剩质量型 high severity 问题，这些问题会被降为 `advisory`
 - 这类 advisory 会继续写入 review / comparison，但不会阻止 `final/*.txt` 导出
-- 只有在 `final prose` 导出后，settlement 账本才会正式写回
+- 当前 canonical 提交流程是：`settlement -> continuity audit -> persist canonical state -> final prose export`
+- `continuity_report` 会先写出；如果 continuity fail，则不会继续写 canonical `summary / delta / chronology / open-loops`，也不会导出 `final/*.txt`
 
 如果未满足条件：
 

@@ -245,25 +245,43 @@ flowchart TD
 下一条明确升级路线是：
 
 1. `Settlement Layer`
-   - 在 `final prose` 后正式生成 `chapter_summary / state_delta / chronology / open_loops`
+   - 在最终提交链中正式生成 `chapter_summary / state_delta / chronology / open_loops`
 2. `State-Driven Planning`
    - 让 `plan-next` 基于状态账本，而不是只依赖前文拼接
+   - 当前已落地初版 `ContextAssembler` 与 `context-pack`
+   - `plan-next` 会先生成 `story/context/chapter-XXXX.context-pack.json`
+   - planner 与 writer 现在通过同一份 `context-pack` 读取：
+     - recent chapter summaries
+     - chronology slice
+     - active open loops
+     - relevant character states
+     - current book phase（当前先 heuristic 推断）
 3. `Continuity Audit`
-   - 新增独立于 reader 的 continuity gate
+  - 新增独立于 reader 的 continuity gate
+  - 当前最小实现已经落地：
+    - `ContinuityAgent`
+    - `story/continuity/chapter-XXXX.continuity-report.json`
+    - continuity fail 时阻止 canonical `persist`
+  - 当前已检查：
+    - timeline
+    - scene coverage
+    - open loop continuity
+    - tracked character state continuity
 4. `Re-settlement`
-   - revise 后重新结算状态，只认最终正文对应的账本
+  - revise 后重新结算状态，只认最终正文对应的账本
 
 这条路线不会替换当前单章主链，而是接在当前主链之后：
 
-`plan -> writer -> analysis -> reader -> revise -> gate -> final prose -> settlement -> continuity audit -> plan next chapter`
+`plan -> writer -> analysis -> reader -> revise -> gate -> settlement -> continuity audit -> persist canonical state -> final prose -> plan next chapter`
 
 当前已经落地的部分是 `Phase 1: Settlement Layer` 初版：
 
-- final prose 后生成 `chapter_summary`
-- final prose 后生成 `chapter_state_delta`
+- canonical persist 前生成 `chapter_summary`
+- canonical persist 前生成 `chapter_state_delta`
 - 增量写回 `chronology`
 - 增量写回 `open_loops`
 - `plan-next` 开始读取 recent chapter summaries / chronology / open loops
+- `Phase 3` 最小 continuity gate 已经接在 settlement 后
 
 ## Character / Theme / Style 如何进入主链
 

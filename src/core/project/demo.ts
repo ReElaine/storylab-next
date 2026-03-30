@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { BookRecord, CharacterSeed, HumanGate, StyleGuide, ThemeSeed } from "../types.js";
+import type { BookRecord, CharacterSeed, HumanGate, StyleGuide, ThemeSeed, WorldRulesConfig } from "../types.js";
 
 export async function createDemoWorkspace(workspaceDir: string): Promise<string> {
   const bookId = "ember-fall";
@@ -12,6 +12,7 @@ export async function createDemoWorkspace(workspaceDir: string): Promise<string>
     mkdir(join(storyDir, "characters"), { recursive: true }),
     mkdir(join(storyDir, "themes"), { recursive: true }),
     mkdir(join(storyDir, "style"), { recursive: true }),
+    mkdir(join(storyDir, "canon"), { recursive: true }),
     mkdir(join(storyDir, "human-gates"), { recursive: true }),
     mkdir(chaptersDir, { recursive: true }),
   ]);
@@ -71,6 +72,27 @@ export async function createDemoWorkspace(workspaceDir: string): Promise<string>
     { key: "finale", label: "结尾收束检查", triggerChapter: 100, purpose: "确认主题兑现与结局收束" },
   ];
 
+  const worldRules: WorldRulesConfig = {
+    rules: [
+      {
+        ruleId: "no-modern-firearms",
+        description: "旧城区火种线不应突然出现现代热武器解决冲突。",
+        severity: "high",
+        forbiddenPhrases: ["手枪", "步枪", "冲锋枪"],
+        appliesWhenAnyPhrases: [],
+        requiredPhrases: [],
+      },
+      {
+        ruleId: "fire-seed-has-cost",
+        description: "涉及火种觉醒的章节，必须明确写出疼痛、失控或代价信号。",
+        severity: "medium",
+        forbiddenPhrases: [],
+        appliesWhenAnyPhrases: ["火种", "余烬", "火"],
+        requiredPhrases: ["疼", "失控", "代价", "烫"],
+      },
+    ],
+  };
+
   const chapter = [
     "# 第1章 灰烬里的门",
     "",
@@ -108,6 +130,7 @@ export async function createDemoWorkspace(workspaceDir: string): Promise<string>
     writeFile(join(storyDir, "characters", "cast.json"), JSON.stringify(characters, null, 2), "utf-8"),
     writeFile(join(storyDir, "themes", "theme-manifest.json"), JSON.stringify(themes, null, 2), "utf-8"),
     writeFile(join(storyDir, "style", "style-guide.json"), JSON.stringify(styleGuide, null, 2), "utf-8"),
+    writeFile(join(storyDir, "canon", "world-rules.json"), JSON.stringify(worldRules, null, 2), "utf-8"),
     writeFile(join(storyDir, "human-gates", "gates.json"), JSON.stringify(gates, null, 2), "utf-8"),
     writeFile(join(chaptersDir, "0001_灰烬里的门.md"), chapter, "utf-8"),
   ]);

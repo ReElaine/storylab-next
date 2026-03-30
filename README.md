@@ -10,7 +10,10 @@
 - 自动循环修订，直到过线或停止
 - 只有全部关键环节通过后，才导出最终正文 `.txt`
 - 串行 LLM 工作流、阶段进度输出与统一 retry 机制
-- Phase 1 Settlement Layer 初版：final prose 后生成 summary / state delta / chronology / open loops
+- Phase 1 Settlement Layer 初版：在最终提交链中生成 summary / state delta / chronology / open loops
+- Phase 2 State-Driven Planning 初版：`plan-next` 会先组装 `context-pack`，再基于账本状态规划下一章
+- Phase 3 Continuity Audit 初版：`continuity agent` 已接入最终提交链，continuity fail 时阻止 canonical persist
+  - 当前最小检查项包括：scene coverage、timeline、open loop continuity、tracked character state continuity、可选 `world-rules.json` 规则检查
 
 当前中短期关注的是“单章质量闭环”，但项目已经正式记录了下一条升级路线：
 
@@ -97,11 +100,16 @@ STORYLAB_OPENAI_BASE_URL=https://your-compatible-endpoint/v1
   - 落在 `books/<bookId>/final/*.txt`
 
 - settlement 账本
-  - 只在 final prose 导出后正式写回
+  - 只在 `settlement -> continuity audit -> persist canonical state` 通过后正式写回
   - `books/<bookId>/story/settlement/chapter-XXXX.chapter-summary.json`
   - `books/<bookId>/story/settlement/chapter-XXXX.chapter-state-delta.json`
   - `books/<bookId>/story/plot/chronology.json`
   - `books/<bookId>/story/plot/open-loops.json`
+
+- state-driven planning 上下文
+  - 在 `plan-next` 时先生成
+  - `books/<bookId>/story/context/chapter-XXXX.context-pack.json`
+  - 供 planner / writer 读取 recent summaries、chronology、open loops、角色当前状态与当前书稿阶段
 
 如果修订后仍未过线，则：
 

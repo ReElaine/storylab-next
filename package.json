@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "test": "npm run build && node --test --test-isolation=none tests/*.test.mjs",
     "demo:init": "node dist/index.js init-demo ./demo-workspace",
     "demo:run": "node dist/index.js run ./demo-workspace ember-fall 1"
   },
