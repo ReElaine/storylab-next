@@ -1,4 +1,5 @@
 import type {
+  CapabilityResourceLedger,
   ChapterAnalysisBundle,
   ChapterDraft,
   ChapterPlan,
@@ -23,6 +24,7 @@ interface ContinuityInput {
   readonly previousChronology: ChronologyLedger;
   readonly previousOpenLoops: OpenLoopsLedger;
   readonly previousRelationships?: RelationshipLedger;
+  readonly previousCapabilityResources?: CapabilityResourceLedger;
   readonly previousReveals?: RevealsLedger;
   readonly previousCharacterHistory: ReadonlyArray<CharacterHistory>;
   readonly worldRules: WorldRulesConfig;
@@ -33,9 +35,13 @@ const KEYWORD_SPLIT = /[，。！？；、“”‘’\s:：,.;!?()（）\-]+/u;
 const OPEN_LOOP_SIGNAL = /后续|下章|以后|必须|记恨|打压|断供|危险|报复|安排|后果|隐患|威胁|追查/u;
 const REVEAL_SIGNAL = /真相|秘密|原来|其实|终于知道|终于明白|揭开|说破|暴露|看穿/u;
 const STATE_TRANSITION_SIGNAL = /开始|终于|第一次|不再|转而|转向|意识到|明白|改口|松动|升级|推进/u;
+const CAPABILITY_IMPROVEMENT_SIGNAL = /恢复|稳住|重新掌控|扛住|顶住|突破|找回|重新拿回/u;
+const RESOURCE_RELIEF_SIGNAL = /恢复供应|拿回|补给|重新获得|补回|得到|领到|换来/u;
+const CONDITION_RELIEF_SIGNAL = /缓过来|恢复|养好|止住|稳定下来|喘过气/u;
 const HARD_BLOCKING_CODES = new Set<ContinuityIssue["code"]>([
   "character_state_conflict",
   "relationship_conflict",
+  "capability_resource_conflict",
   "open_loop_conflict",
   "reveal_conflict",
 ]);
@@ -394,6 +400,89 @@ function detectRelationshipIssues(input: ContinuityInput): ReadonlyArray<Continu
   return issues;
 }
 
+function detectCapabilityResourceIssues(input: ContinuityInput): ReadonlyArray<ContinuityIssue> {
+  const issues: ContinuityIssue[] = [];
+  const chapterSignals = buildChapterSignals(input);
+  const previousEntries = input.previousCapabilityResources?.entries ?? [];
+  const currentEntries = new Map(
+    (input.settlement.capabilityResources?.entries ?? []).map((entry) => [entry.character, entry] as const),
+  );
+
+  const indicatesPressure = (text: string): boolean => /断供|不足|匮乏|受限|危险|暴露|盯上|无退路|更难|亏空/u.test(text);
+  const indicatesRelief = (text: string): boolean => /恢复|充足|宽松|补回|稳定|缓过来|重新拿回/u.test(text);
+
+  const latestPreviousByCharacter = new Map<string, typeof previousEntries[number]>();
+  for (const entry of previousEntries) {
+    const existing = latestPreviousByCharacter.get(entry.character);
+    if (!existing || existing.chapterNumber < entry.chapterNumber) {
+      latestPreviousByCharacter.set(entry.character, entry);
+    }
+  }
+
+  for (const [character, previous] of latestPreviousByCharacter.entries()) {
+    const current = currentEntries.get(character);
+    if (!current) {
+      continue;
+    }
+
+    if (
+      indicatesPressure(previous.resourceState)
+      && indicatesRelief(current.resourceState)
+      && !RESOURCE_RELIEF_SIGNAL.test(chapterSignals)
+    ) {
+      issues.push(
+        createIssue({
+          code: "capability_resource_conflict",
+          severity: "high",
+          scope: "state",
+          sceneNumber: null,
+          refs: [character, ...current.evidenceRefs],
+          message: `角色「${character}」上一章还处在“${previous.resourceState}”，本章却直接变成“${current.resourceState}”，缺少资源恢复的桥接。`,
+          recommendation: "在正文或 settlement 中补出补给、交易、夺回、恢复供应等中间事件，否则保持资源状态连续。",
+        }),
+      );
+    }
+
+    if (
+      indicatesPressure(previous.conditionState)
+      && indicatesRelief(current.conditionState)
+      && !CONDITION_RELIEF_SIGNAL.test(chapterSignals)
+    ) {
+      issues.push(
+        createIssue({
+          code: "capability_resource_conflict",
+          severity: "medium",
+          scope: "state",
+          sceneNumber: null,
+          refs: [character, ...current.evidenceRefs],
+          message: `角色「${character}」上一章还处在“${previous.conditionState}”，本章却直接变成“${current.conditionState}”，缺少状态恢复的桥接。`,
+          recommendation: "补出疗伤、缓冲、脱险或代价消化过程，否则保持条件状态连续。",
+        }),
+      );
+    }
+
+    if (
+      /受限|压制|无法|只能/u.test(previous.capabilityState)
+      && /掌控|恢复|爆发|突破|压住/u.test(current.capabilityState)
+      && !CAPABILITY_IMPROVEMENT_SIGNAL.test(chapterSignals)
+    ) {
+      issues.push(
+        createIssue({
+          code: "capability_resource_conflict",
+          severity: "medium",
+          scope: "state",
+          sceneNumber: null,
+          refs: [character, ...current.evidenceRefs],
+          message: `角色「${character}」的能力状态从“${previous.capabilityState}”突然跳到“${current.capabilityState}”，正文缺少恢复或提升桥接。`,
+          recommendation: "补出恢复、突破、训练、得到帮助或条件变化，否则保持能力状态连续。",
+        }),
+      );
+    }
+  }
+
+  return issues;
+}
+
 function scoreLoopCoverage(loop: OpenLoopEntry, chapterSignals: string): number {
   let score = 0;
   for (const keyword of extractKeywords(loop.description)) {
@@ -667,6 +756,7 @@ export class ContinuityAgent {
       ...detectSceneCoverageIssues(input),
       ...detectCharacterIssues(input),
       ...detectRelationshipIssues(input),
+      ...detectCapabilityResourceIssues(input),
       ...detectOpenLoopIssues(input),
       ...detectRevealIssues(input),
       ...detectWorldRuleIssues(input),
@@ -697,6 +787,7 @@ export class ContinuityAgent {
         previousOpenLoops: input.previousOpenLoops.loops.length,
         previousReveals: input.previousReveals?.entries.length ?? 0,
         previousRelationships: input.previousRelationships?.entries.length ?? 0,
+        previousCapabilityResourceEntries: input.previousCapabilityResources?.entries.length ?? 0,
         trackedCharacters: input.previousCharacterHistory.length,
         chronologyInsertions: input.settlement.chapterStateDelta.chronologyInsertions.length,
         worldRules: input.worldRules.rules.length,

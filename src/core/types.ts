@@ -281,6 +281,22 @@ export interface ThemeProgressionLedger {
   readonly entries: ReadonlyArray<ThemeProgressionEntry>;
 }
 
+export interface CapabilityResourceLedgerEntry {
+  readonly entryId: string;
+  readonly chapterNumber: number;
+  readonly character: string;
+  readonly capabilityState: string;
+  readonly resourceState: string;
+  readonly conditionState: string;
+  readonly activeConstraints: ReadonlyArray<string>;
+  readonly sceneNumbers: ReadonlyArray<number>;
+  readonly evidenceRefs: ReadonlyArray<string>;
+}
+
+export interface CapabilityResourceLedger {
+  readonly entries: ReadonlyArray<CapabilityResourceLedgerEntry>;
+}
+
 export interface SceneOutputState {
   readonly immediateOutcome: string;
   readonly characterStateShifts: ReadonlyArray<string>;
@@ -288,6 +304,7 @@ export interface SceneOutputState {
   readonly relationshipShifts: ReadonlyArray<string>;
   readonly revealSignals: ReadonlyArray<string>;
   readonly thematicMovement: string;
+  readonly capabilityResourceShifts: ReadonlyArray<string>;
 }
 
 export interface SceneStateDelta {
@@ -335,6 +352,7 @@ export interface SettlementBundle {
   readonly reveals: RevealsLedger;
   readonly relationships: RelationshipLedger;
   readonly themeProgression: ThemeProgressionLedger;
+  readonly capabilityResources: CapabilityResourceLedger;
 }
 
 export interface SettlementOutputPaths {
@@ -345,6 +363,7 @@ export interface SettlementOutputPaths {
   readonly revealsPath: string;
   readonly relationshipsPath: string;
   readonly themeProgressionPath: string;
+  readonly capabilityResourcesPath: string;
 }
 
 export interface ContinuityIssue {
@@ -353,6 +372,7 @@ export interface ContinuityIssue {
     | "scene_coverage_conflict"
     | "character_state_conflict"
     | "relationship_conflict"
+    | "capability_resource_conflict"
     | "open_loop_conflict"
     | "reveal_conflict"
     | "world_rule_conflict"
@@ -375,6 +395,7 @@ export interface ContinuityReport {
     readonly previousOpenLoops: number;
     readonly previousReveals: number;
     readonly previousRelationships: number;
+    readonly previousCapabilityResourceEntries: number;
     readonly trackedCharacters: number;
     readonly chronologyInsertions: number;
     readonly worldRules: number;
@@ -437,6 +458,7 @@ export interface ContextPack {
   readonly recentReveals: ReadonlyArray<RevealEntry>;
   readonly recentRelationshipChanges: ReadonlyArray<RelationshipLedgerEntry>;
   readonly recentThemeProgression: ReadonlyArray<ThemeProgressionEntry>;
+  readonly recentCapabilityResourceStates: ReadonlyArray<CapabilityResourceLedgerEntry>;
   readonly chronologySlice: ReadonlyArray<ChronologyEvent>;
   readonly relevantCharacterStates: ReadonlyArray<{
     readonly name: string;

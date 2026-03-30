@@ -2,21 +2,21 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { ChapterPlanner } from "../dist/core/modules/chapter-planner.js";
 
-test("chapter planner uses reveals, relationships, and theme progression to build the next mission", () => {
+test("chapter planner uses reveals, relationships, theme progression, and capability state to build the next mission", () => {
   const planner = new ChapterPlanner();
   const plan = planner.planNextChapter(
     2,
     [
       {
-        name: "林凡",
+        name: "主角",
         latestState: {
-          name: "林凡",
+          name: "主角",
           desire: "改变命运",
           fear: "继续被打压",
-          misbelief: "只要再忍一忍就能熬过去",
-          recentDecision: "当众反抗",
-          decisionCost: "赵执事记恨并准备断供",
-          relationshipShift: ["与赵执事对立"],
+          misbelief: "只要再忍一步就能熬过去",
+          recentDecision: "当众反击",
+          decisionCost: "执事已经记恨并准备断供",
+          relationshipShift: ["与执事对立"],
           arcProgress: "第一次公开反抗规则",
           presentInChapter: true,
         },
@@ -28,10 +28,10 @@ test("chapter planner uses reveals, relationships, and theme progression to buil
         {
           chapterNumber: 1,
           theme: "反抗有代价",
-          antiTheme: "忍耐可以保平安",
+          antiTheme: "低头可以换安全",
           themeSignalCount: 3,
           antiSignalCount: 1,
-          interpretation: "林凡开始意识到，反抗不会免费。",
+          interpretation: "主角开始意识到，反抗不会免费。",
         },
       ],
     },
@@ -48,8 +48,8 @@ test("chapter planner uses reveals, relationships, and theme progression to buil
     [
       {
         chapterNumber: 1,
-        title: "第一次反抗",
-        summary: "林凡当众夺回灵石，但赵执事开始记恨。",
+        title: "第一次反击",
+        summary: "主角当众夺回配给，但执事已经开始记恨。",
         keyEvents: [],
         changedCharacters: [],
         openedLoopIds: ["loop-ch0001-01"],
@@ -64,9 +64,9 @@ test("chapter planner uses reveals, relationships, and theme progression to buil
           chapterNumber: 1,
           sceneNumber: 1,
           sceneId: "scene-1",
-          actors: ["林凡", "赵执事"],
-          summary: "林凡当众夺回灵石",
-          consequence: "赵执事记恨，后续资源将被打压",
+          actors: ["主角", "执事"],
+          summary: "主角当众夺回配给",
+          consequence: "执事记恨，后续资源将被打压",
         },
       ],
     },
@@ -76,13 +76,13 @@ test("chapter planner uses reveals, relationships, and theme progression to buil
           loopId: "loop-ch0001-01",
           type: "threat",
           introducedInChapter: 1,
-          owner: "赵执事",
-          description: "赵执事记恨林凡，后续资源可能被断供",
+          owner: "执事",
+          description: "执事记恨主角，后续资源可能被断供",
           expectedPayoffWindow: "soon",
           urgency: "high",
           status: "open",
           payoffConstraints: [],
-          relatedEntities: ["林凡", "赵执事"],
+          relatedEntities: ["主角", "执事"],
           evidenceRefs: ["scene-1"],
           lastUpdatedChapter: 1,
         },
@@ -97,11 +97,11 @@ test("chapter planner uses reveals, relationships, and theme progression to buil
           sceneId: "scene-3",
           sourceLoopId: "loop-ch0001-01",
           category: "promise",
-          subject: "赵执事的打压方式",
-          revealedTruth: "赵执事会先用断供把林凡逼进更危险的差事",
+          subject: "执事的打压方式",
+          revealedTruth: "执事会先用断供把主角逼进更危险的差事",
           revealStrength: "partial",
           knownByReader: true,
-          knownByCharacters: ["林凡"],
+          knownByCharacters: ["主角"],
           evidenceRefs: ["scene-3"],
         },
       ],
@@ -109,12 +109,12 @@ test("chapter planner uses reveals, relationships, and theme progression to buil
     {
       entries: [
         {
-          relationshipId: "linfan::zhao",
-          characters: ["林凡", "赵执事"],
-          status: "林凡与赵执事从顺从转公开对立",
+          relationshipId: "lead::steward",
+          characters: ["主角", "执事"],
+          status: "主角与执事从隐忍转为公开对立",
           polarity: "hostile",
           tension: "high",
-          lastChange: "林凡与赵执事从顺从转公开对立",
+          lastChange: "主角与执事从隐忍转为公开对立",
           lastUpdatedChapter: 1,
           evidenceRefs: ["scene-3"],
         },
@@ -130,8 +130,23 @@ test("chapter planner uses reveals, relationships, and theme progression to buil
           movementSummary: "主角已经意识到，反抗后的代价会持续升级，而不是一次性过去。",
           stance: "toward_theme",
           pressurePoint: "短期胜利之后，代价必须继续落地。",
-          carrierCharacters: ["林凡", "赵执事"],
+          carrierCharacters: ["主角", "执事"],
           supportingSceneNumbers: [3, 4],
+          evidenceRefs: ["scene-3", "scene-4"],
+        },
+      ],
+    },
+    {
+      entries: [
+        {
+          entryId: "capres-ch0001-lead",
+          chapterNumber: 1,
+          character: "主角",
+          capabilityState: "已经敢于公开反击",
+          resourceState: "后续配给与机会可能被断供",
+          conditionState: "已经被外门体系盯上，处境更危险",
+          activeConstraints: ["执事会继续拿配给和规矩压他"],
+          sceneNumbers: [3, 4],
           evidenceRefs: ["scene-3", "scene-4"],
         },
       ],
@@ -146,7 +161,7 @@ test("chapter planner uses reveals, relationships, and theme progression to buil
     },
   );
 
-  assert.ok(plan.chapterMission.includes("赵执事的打压方式"));
+  assert.ok(plan.chapterMission.includes("执事的打压方式"));
   assert.ok(plan.chapterMission.includes("揭示"));
   assert.ok(plan.themeIntent.includes("反抗有代价"));
   assert.ok(plan.thematicQuestion.includes("代价"));

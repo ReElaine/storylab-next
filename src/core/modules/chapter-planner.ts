@@ -1,4 +1,5 @@
 import type {
+  CapabilityResourceLedger,
   ChapterPlan,
   ChapterSummaryRecord,
   CharacterHistory,
@@ -39,7 +40,9 @@ function buildMission(
   reveals: RevealsLedger,
   relationships: RelationshipLedger,
   themeProgression: ThemeProgressionLedger,
+  capabilityResources: CapabilityResourceLedger,
 ): string {
+  const latestCapabilityState = capabilityResources.entries.at(-1);
   const latestReveal = reveals.entries.at(-1);
   if (latestReveal) {
     return `承接“${latestReveal.subject}”已被揭示为“${latestReveal.revealedTruth}”，把真相转成新的行动压力与后果。`;
@@ -59,6 +62,10 @@ function buildMission(
   const latestThemeProgression = themeProgression.entries.at(-1);
   if (latestThemeProgression) {
     return `承接主题推进“${latestThemeProgression.primaryTheme}”，继续把“${latestThemeProgression.movementSummary}”压成新的选择与代价。`;
+  }
+
+  if (latestCapabilityState) {
+    return `承接「${latestCapabilityState.character}」当前的能力/资源/状态约束，把“${latestCapabilityState.resourceState}”和“${latestCapabilityState.conditionState}”推进成更具体的章节行动。`;
   }
 
   if (memory.activeHooks.length > 0) {
@@ -83,6 +90,7 @@ function buildSceneBlueprint(
   reveals: RevealsLedger,
   relationships: RelationshipLedger,
   themeProgression: ThemeProgressionLedger,
+  capabilityResources: CapabilityResourceLedger,
 ): ReadonlyArray<SceneBlueprintItem> {
   const lead = characterHistory[0]?.latestState;
   const obstacle = characterHistory[1]?.latestState;
@@ -93,6 +101,7 @@ function buildSceneBlueprint(
     ?? openLoops.loops.find((loop) => loop.status !== "closed");
   const latestReveal = reveals.entries.at(-1);
   const latestRelationship = relationships.entries.at(-1);
+  const latestCapabilityState = capabilityResources.entries.at(-1);
   const recentEvent = chronology.events.at(-1);
   const leadName = lead?.name ?? "主角";
   const relationshipOpponent = latestRelationship?.characters.find((name) => name !== leadName);
@@ -104,6 +113,7 @@ function buildSceneBlueprint(
     ? `${latestReveal.subject}的真相已明确：${latestReveal.revealedTruth}`
     : urgentLoop?.description
       ?? latestRelationship?.lastChange
+      ?? latestCapabilityState?.resourceState
       ?? latestSummary?.summary
       ?? recentEvent?.summary
       ?? "上一章遗留的问题";
@@ -122,7 +132,7 @@ function buildSceneBlueprint(
       drivingCharacter: leadName,
       opposingForce: opposingName,
       decision: `${leadName}必须决定是继续推进，还是暂时后撤`,
-      cost: `${leadName}一旦继续推进，就要先付出${lead?.decisionCost ?? "明确代价"}`,
+      cost: `${leadName}一旦继续推进，就要先付出${latestCapabilityState?.conditionState ?? lead?.decisionCost ?? "明确代价"}`,
       relationshipChange: latestRelationship?.lastChange ?? `${leadName}与${opposingName}从试探进入高压对抗`,
       thematicTension: latestThemeProgression?.pressurePoint ?? `${theme} vs ${antiTheme}`,
       valuePositionA: theme,
@@ -143,7 +153,7 @@ function buildSceneBlueprint(
       drivingCharacter: leadName,
       opposingForce: opposingName,
       decision: `${leadName}必须在隐忍、求助或抢先行动之间做决定`,
-      cost: `该决定会立刻带来 ${lead?.decisionCost ?? "关系与身体上的代价"}`,
+      cost: `该决定会立刻带来 ${latestCapabilityState?.resourceState ?? lead?.decisionCost ?? "关系与身体上的代价"}`,
       relationshipChange: latestRelationship?.lastChange ?? `${leadName}与${opposingName}的关系被迫重新划线`,
       thematicTension: `价值冲突通过选择体现：${valueConflict}`,
       valuePositionA: theme,
@@ -164,7 +174,7 @@ function buildSceneBlueprint(
       drivingCharacter: leadName,
       opposingForce: `${opposingName}与更大的系统压力`,
       decision: `${leadName}必须接受代价已经发生，而不是继续自我合理化`,
-      cost: "代价从抽象威胁变成具体后果",
+      cost: latestCapabilityState?.activeConstraints[0] ?? "代价从抽象威胁变成具体后果",
       relationshipChange: latestRelationship?.lastChange ?? `${leadName}与${opposingName}的信任被重新定义`,
       thematicTension: `让 ${theme} 暂时占上风，但保留 ${antiTheme} 的诱惑`,
       valuePositionA: theme,
@@ -187,6 +197,7 @@ export class ChapterPlanner {
     reveals: RevealsLedger,
     relationships: RelationshipLedger,
     themeProgression: ThemeProgressionLedger,
+    capabilityResources: CapabilityResourceLedger,
     gates: ReadonlyArray<HumanGate>,
     styleGuide: StyleGuide,
   ): ChapterPlan {
@@ -203,7 +214,7 @@ export class ChapterPlanner {
 
     return {
       targetChapterNumber,
-      chapterMission: buildMission(memory, chapterSummaries, openLoops, reveals, relationships, themeProgression),
+      chapterMission: buildMission(memory, chapterSummaries, openLoops, reveals, relationships, themeProgression, capabilityResources),
       readerGoal: "让读者同时获得推进感、代价感和明确的追读钩子。",
       sceneBlueprint: buildSceneBlueprint(
         presentCharacters,
@@ -215,6 +226,7 @@ export class ChapterPlanner {
         reveals,
         relationships,
         themeProgression,
+        capabilityResources,
       ),
       characterIntent: presentCharacters.map((entry, index) => ({
         name: entry.name,
@@ -239,6 +251,8 @@ export class ChapterPlanner {
             ? `本章必须继续承接 open loop：“${activeLoop.description}”。`
             : relationships.entries.at(-1)
               ? `本章必须继续承接关系变化：“${relationships.entries.at(-1)?.characters.join(" / ")} -> ${relationships.entries.at(-1)?.lastChange}”。`
+              : capabilityResources.entries.at(-1)
+                ? `本章必须继续承接能力/资源/状态约束：“${capabilityResources.entries.at(-1)?.character} -> ${capabilityResources.entries.at(-1)?.resourceState}；${capabilityResources.entries.at(-1)?.conditionState}”。`
               : "本章没有命中阻断式 gate，但仍需按 revision brief 自查。",
     };
   }

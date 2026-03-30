@@ -41,6 +41,7 @@ export class HeuristicPlanningEngine implements PlanningEngine {
       { entries: input.contextPack.recentReveals },
       { entries: input.contextPack.recentRelationshipChanges },
       { entries: input.contextPack.recentThemeProgression },
+      { entries: input.contextPack.recentCapabilityResourceStates },
       input.gates,
       input.styleGuide,
     );

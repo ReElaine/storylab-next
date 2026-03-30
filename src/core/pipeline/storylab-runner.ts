@@ -335,12 +335,13 @@ export class StorylabRunner {
   async planNext(bookId: string, targetChapterNumber: number): Promise<StorylabPlanResult> {
     await this.store.ensureStoryDirs(bookId);
     this.report("plan", `开始规划第 ${targetChapterNumber} 章`);
-    const [book, styleGuide, characterHistory, themeHistory, themeProgression, storyMemory, chapterSummaries, chronology, openLoops, reveals, relationships, gates] = await Promise.all([
+    const [book, styleGuide, characterHistory, themeHistory, themeProgression, capabilityResources, storyMemory, chapterSummaries, chronology, openLoops, reveals, relationships, gates] = await Promise.all([
       this.store.loadBook(bookId),
       this.store.loadStyleGuide(bookId),
       this.store.loadCharacterHistory(bookId),
       this.store.loadThemeHistory(bookId),
       this.store.loadThemeProgression(bookId),
+      this.store.loadCapabilityResources(bookId),
       this.store.loadStoryMemory(bookId),
       this.store.loadRecentChapterSummaries(bookId, 3),
       this.store.loadChronology(bookId),
@@ -360,6 +361,7 @@ export class StorylabRunner {
       reveals,
       relationships,
       themeProgression,
+      capabilityResources,
     });
 
     const contextPackPath = await this.store.writeOutput(
@@ -763,10 +765,11 @@ export class StorylabRunner {
   ): Promise<CanonicalCandidateArtifacts> {
     this.report("persist", `开始重结算第 ${ctx.chapterNumber} 章候选正文（基于第 ${ctx.chapterNumber - 1} 章前 canonical 基线）`);
 
-    const [previousChronology, previousOpenLoops, previousRelationships, previousReveals, previousThemeProgression, worldRules] = await Promise.all([
+    const [previousChronology, previousOpenLoops, previousRelationships, previousCapabilityResources, previousReveals, previousThemeProgression, worldRules] = await Promise.all([
       this.store.loadChronologyBeforeChapter(ctx.bookId, ctx.chapterNumber),
       this.store.loadOpenLoopsBeforeChapter(ctx.bookId, ctx.chapterNumber),
       this.store.loadRelationshipsBeforeChapter(ctx.bookId, ctx.chapterNumber),
+      this.store.loadCapabilityResourcesBeforeChapter(ctx.bookId, ctx.chapterNumber),
       this.store.loadRevealsBeforeChapter(ctx.bookId, ctx.chapterNumber),
       this.store.loadThemeProgressionBeforeChapter(ctx.bookId, ctx.chapterNumber),
       this.store.loadWorldRules(ctx.bookId),
@@ -780,6 +783,7 @@ export class StorylabRunner {
       previousChronology,
       previousOpenLoops,
       previousRelationships,
+      previousCapabilityResources,
       previousThemeProgression,
       previousChapterStateDelta: options?.previousChapterStateDelta ?? null,
       rewrittenSceneNumbers: options?.rewrittenSceneNumbers ?? [],
@@ -795,6 +799,7 @@ export class StorylabRunner {
       previousChronology,
       previousOpenLoops,
       previousRelationships,
+      previousCapabilityResources,
       previousReveals,
       previousCharacterHistory: ctx.previousCharacterHistory,
       worldRules,
@@ -1212,7 +1217,7 @@ export class StorylabRunner {
       previousMemory: ctx.previousMemory,
     });
 
-    const [chapterSummaryPath, stateDeltaPath, chronologyPath, openLoopsPath, revealsPath, relationshipsPath, themeProgressionPath, finalProsePath] = await Promise.all([
+    const [chapterSummaryPath, stateDeltaPath, chronologyPath, openLoopsPath, revealsPath, relationshipsPath, themeProgressionPath, capabilityResourcesPath, finalProsePath] = await Promise.all([
       this.store.writeOutput(
         ctx.bookId,
         "settlement",
@@ -1255,9 +1260,15 @@ export class StorylabRunner {
         "theme-progression.json",
         JSON.stringify(settlement.themeProgression, null, 2),
       ),
+      this.store.writeOutput(
+        ctx.bookId,
+        "characters",
+        "capability-resource-ledger.json",
+        JSON.stringify(settlement.capabilityResources, null, 2),
+      ),
       this.store.writeFinalProse(ctx.bookId, draft),
     ]);
-    this.report("persist", `第 ${ctx.chapterNumber} 章 settlement 已写回 summary/state-delta/chronology/open-loops/reveals/relationships/theme-progression`);
+    this.report("persist", `第 ${ctx.chapterNumber} 章 settlement 已写回 summary/state-delta/chronology/open-loops/reveals/relationships/theme-progression/capability-resource`);
 
     return {
       continuityReportPath,
@@ -1270,6 +1281,7 @@ export class StorylabRunner {
         revealsPath,
         relationshipsPath,
         themeProgressionPath,
+        capabilityResourcesPath,
       },
       finalProsePath,
     };

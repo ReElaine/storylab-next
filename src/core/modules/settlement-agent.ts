@@ -1,4 +1,6 @@
-﻿import type {
+import type {
+  CapabilityResourceLedger,
+  CapabilityResourceLedgerEntry,
   ChapterAnalysisBundle,
   ChapterDraft,
   ChapterPlan,
@@ -29,6 +31,7 @@ interface SettlementInput {
   readonly previousChronology: ChronologyLedger;
   readonly previousOpenLoops: OpenLoopsLedger;
   readonly previousRelationships?: RelationshipLedger;
+  readonly previousCapabilityResources?: CapabilityResourceLedger;
   readonly previousThemeProgression?: ThemeProgressionLedger;
   readonly previousChapterStateDelta?: ChapterStateDelta | null;
   readonly rewrittenSceneNumbers?: ReadonlyArray<number>;
@@ -44,6 +47,9 @@ const IMMEDIATE_ACTION_SIGNAL = /揣入|捏住|撞得|挤了过来|看也没看|
 const RELATIONSHIP_HOSTILE_SIGNAL = /对立|结仇|记恨|打压|围剿|眼中钉|撕破脸|敌视|仇|报复/u;
 const RELATIONSHIP_ALLIED_SIGNAL = /联手|结盟|信任|合作|协作|靠近|站到一起|同路|缓和|和解/u;
 const RELATIONSHIP_STRAINED_SIGNAL = /试探|警惕|怀疑|拉开|重新划线|高压协作|疏离|僵住/u;
+const CAPABILITY_SIGNAL = /反击|压住|夺回|突破|追查|看穿|掌控|出手|爆发|夺下|扛住|稳住|硬顶/u;
+const RESOURCE_SIGNAL = /资源|配额|断供|份额|口粮|证据|线索|钱|药|装备|补给|机会|配给|权限/u;
+const CONDITION_SIGNAL = /受伤|虚弱|疲惫|危险|盯上|暴露|受限|无退路|更冷|高压|困住|险地|任务/u;
 
 function uniqueStrings(values: ReadonlyArray<string>): ReadonlyArray<string> {
   return Array.from(new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)));
@@ -65,7 +71,7 @@ function trimClause(text: string, maxLength = 56): string {
 function normalizeLedgerPhrase(text: string): string {
   return text
     .replace(/^还是/u, "")
-    .replace(/，?林凡必须决定是继续低头$/u, "")
+    .replace(/，?[^，。！？]{1,12}必须决定是继续低头$/u, "")
     .replace(/^只要反抗，?/u, "")
     .replace(/^\s*而/u, "")
     .replace(/，?而变成必须做出的选择$/u, "")
@@ -131,12 +137,12 @@ function scoreCanonicalCandidate(text: string, kind: "event" | "consequence"): n
 
   if (kind === "event" && EVENT_SIGNAL.test(normalized)) score += 4;
   if (kind === "consequence" && CONSEQUENCE_SIGNAL.test(normalized)) score += 4;
-  if (/抢走|夺回|反击|断供|安排|打压|记恨|灵石|危险/u.test(normalized)) score += 4;
+  if (/抢走|夺回|反击|断供|安排|打压|记恨|资源|配额|证据|资格|危险/u.test(normalized)) score += 4;
   if (kind === "event" && /默许|偏帮|抢走|羞辱/u.test(normalized)) score += 3;
   if (/意识到|明白|知道|看见|感到/u.test(normalized)) score -= 2;
   if (/必须决定|继续低头/u.test(normalized)) score -= 3;
   if (kind === "consequence" && IMMEDIATE_ACTION_SIGNAL.test(normalized) && !CONSEQUENCE_SIGNAL.test(normalized)) score -= 4;
-  if (/偏帮有背景的弟子/u.test(normalized)) score -= 4;
+  if (/偏帮有背景/u.test(normalized)) score -= 4;
   if (normalized.length >= 8 && normalized.length <= 40) score += 2;
 
   return score;
@@ -594,6 +600,88 @@ function buildRelationships(
   };
 }
 
+function inferCapabilityState(
+  sceneDelta: SceneStateDelta,
+  relevantCharacterStates: ReadonlyArray<ChapterAnalysisBundle["characterStates"][number]>,
+): string {
+  const candidates = uniqueStrings([
+    ...(sceneDelta.outputState.capabilityResourceShifts ?? []).filter((entry) => CAPABILITY_SIGNAL.test(entry)),
+    ...relevantCharacterStates.map((entry) => `${entry.name}：${entry.recentDecision}`),
+    ...relevantCharacterStates.map((entry) => `${entry.name}：${entry.arcProgress}`),
+  ]).filter((entry) => CAPABILITY_SIGNAL.test(entry) || /决定|行动|反抗|推进|压住|追查/u.test(entry));
+
+  return trimSentence(normalizeLedgerPhrase(candidates[0] ?? sceneDelta.summary), 72);
+}
+
+function inferResourceState(sceneDelta: SceneStateDelta, evidence: string): string {
+  const candidates = uniqueStrings([
+    ...(sceneDelta.outputState.capabilityResourceShifts ?? []).filter((entry) => RESOURCE_SIGNAL.test(entry)),
+    ...(sceneDelta.outputState.carryForwardPressures ?? []).filter((entry) => RESOURCE_SIGNAL.test(entry)),
+    ...splitIntoSentences(evidence).filter((entry) => RESOURCE_SIGNAL.test(entry)),
+    sceneDelta.consequence,
+  ]).filter((entry) => RESOURCE_SIGNAL.test(entry) || /受限|被扣|不足/u.test(entry));
+
+  return trimSentence(normalizeLedgerPhrase(candidates[0] ?? "可支配资源开始受限"), 72);
+}
+
+function inferConditionState(sceneDelta: SceneStateDelta, evidence: string): string {
+  const candidates = uniqueStrings([
+    ...(sceneDelta.outputState.capabilityResourceShifts ?? []).filter((entry) => CONDITION_SIGNAL.test(entry)),
+    ...(sceneDelta.outputState.carryForwardPressures ?? []).filter((entry) => CONDITION_SIGNAL.test(entry)),
+    ...splitIntoSentences(evidence).filter((entry) => CONDITION_SIGNAL.test(entry)),
+    sceneDelta.consequence,
+  ]).filter((entry) => CONDITION_SIGNAL.test(entry) || /代价|压力|后果/u.test(entry));
+
+  return trimSentence(normalizeLedgerPhrase(candidates[0] ?? "当前处境更受限，后续压力正在累积"), 72);
+}
+
+function buildCapabilityResources(
+  input: SettlementInput,
+  sceneEvidenceMap: ReadonlyMap<number, string>,
+  sceneDeltas: ReadonlyArray<SceneStateDelta>,
+): CapabilityResourceLedger {
+  const previousEntries = input.previousCapabilityResources?.entries ?? [];
+  const nextEntries = new Map(
+    previousEntries.map((entry) => [`${entry.character}@${entry.chapterNumber}`, entry] as const),
+  );
+
+  const presentCharacters = input.analysis.characterStates.filter((entry) => entry.presentInChapter);
+  for (const character of presentCharacters) {
+    const relatedSceneDeltas = sceneDeltas.filter((sceneDelta) => sceneDelta.actors.includes(character.name));
+    if (relatedSceneDeltas.length === 0) {
+      continue;
+    }
+
+    const evidence = relatedSceneDeltas
+      .map((sceneDelta) => sceneEvidenceMap.get(sceneDelta.sceneNumber) ?? "")
+      .join("\n");
+    const activeConstraints = uniqueStrings([
+      character.decisionCost,
+      ...relatedSceneDeltas.flatMap((sceneDelta) => sceneDelta.outputState.carryForwardPressures ?? []),
+      ...relatedSceneDeltas.flatMap((sceneDelta) => (sceneDelta.outputState.capabilityResourceShifts ?? []).filter((entry) => CONDITION_SIGNAL.test(entry) || RESOURCE_SIGNAL.test(entry))),
+    ]).slice(0, 4);
+    const entry = {
+      entryId: `capres-ch${String(input.chapterNumber).padStart(4, "0")}-${character.name}`,
+      chapterNumber: input.chapterNumber,
+      character: character.name,
+      capabilityState: inferCapabilityState(relatedSceneDeltas.at(-1)!, [character]),
+      resourceState: inferResourceState(relatedSceneDeltas.at(-1)!, evidence),
+      conditionState: inferConditionState(relatedSceneDeltas.at(-1)!, evidence),
+      activeConstraints,
+      sceneNumbers: relatedSceneDeltas.map((sceneDelta) => sceneDelta.sceneNumber),
+      evidenceRefs: relatedSceneDeltas.map((sceneDelta) => `scene-${sceneDelta.sceneNumber}`),
+    } satisfies CapabilityResourceLedgerEntry;
+
+    nextEntries.set(`${entry.character}@${entry.chapterNumber}`, entry);
+  }
+
+  return {
+    entries: Array.from(nextEntries.values()).sort((left, right) => (
+      left.chapterNumber - right.chapterNumber || left.character.localeCompare(right.character, "zh-Hans-CN")
+    )),
+  };
+}
+
 function knownNamesInText(text: string, names: ReadonlyArray<string>): boolean {
   return names.some((name) => text.includes(name));
 }
@@ -631,7 +719,7 @@ function buildSceneOutputState(
     ...relevantCharacterStates.map((entry) => entry.decisionCost),
     OPEN_LOOP_SIGNAL.test(event.consequence) ? event.consequence : "",
   ])
-    .filter((entry) => OPEN_LOOP_SIGNAL.test(entry) || /记恨|断供|危险|报复|安排|停发|深井|打压/u.test(entry))
+    .filter((entry) => OPEN_LOOP_SIGNAL.test(entry) || /记恨|断供|危险|报复|安排|停发|险地|任务|打压/u.test(entry))
     .map((entry) => trimSentence(normalizeLedgerPhrase(entry), 72))
     .slice(0, 3);
 
@@ -650,6 +738,17 @@ function buildSceneOutputState(
     REVEAL_SIGNAL.test(event.consequence) ? event.consequence : "",
   ]).map((entry) => trimSentence(normalizeLedgerPhrase(entry), 72)).slice(0, 2);
 
+  const capabilityResourceShifts = uniqueStrings([
+    ...splitIntoSentences(evidence).filter((sentence) => CAPABILITY_SIGNAL.test(sentence) || RESOURCE_SIGNAL.test(sentence) || CONDITION_SIGNAL.test(sentence)),
+    ...(planScene?.newInformation ?? []).filter((entry) => CAPABILITY_SIGNAL.test(entry) || RESOURCE_SIGNAL.test(entry) || CONDITION_SIGNAL.test(entry)),
+    ...relevantCharacterStates.flatMap((entry) => [entry.recentDecision, entry.decisionCost, entry.arcProgress]),
+    event.summary,
+    event.consequence,
+  ])
+    .filter((entry) => CAPABILITY_SIGNAL.test(entry) || RESOURCE_SIGNAL.test(entry) || CONDITION_SIGNAL.test(entry))
+    .map((entry) => trimSentence(normalizeLedgerPhrase(entry), 72))
+    .slice(0, 4);
+
   return {
     immediateOutcome: trimSentence(event.consequence, 72),
     characterStateShifts,
@@ -660,6 +759,7 @@ function buildSceneOutputState(
       normalizeLedgerPhrase(planScene?.thematicTension ?? input.plan.themeIntent ?? event.consequence),
       72,
     ),
+    capabilityResourceShifts,
   };
 }
 
@@ -699,6 +799,7 @@ function buildRawSceneDeltas(
         ...outputState.carryForwardPressures,
         ...outputState.relationshipShifts,
         ...outputState.revealSignals,
+        ...outputState.capabilityResourceShifts,
         outputState.thematicMovement,
       ]).slice(0, 6),
       loopIds: [],
@@ -999,9 +1100,10 @@ function enrichSceneDeltas(
       relationshipIds,
       stateHighlights: uniqueStrings([
         ...sceneDelta.stateHighlights,
-        ...sceneDelta.outputState.carryForwardPressures,
-        ...sceneDelta.outputState.relationshipShifts,
-        ...sceneDelta.outputState.revealSignals,
+        ...(sceneDelta.outputState.carryForwardPressures ?? []),
+        ...(sceneDelta.outputState.relationshipShifts ?? []),
+        ...(sceneDelta.outputState.revealSignals ?? []),
+        ...(sceneDelta.outputState.capabilityResourceShifts ?? []),
         ...loopUpdates
           .filter((loop) => loop.evidence.includes(sceneRef))
           .map((loop) => `${loop.action}:${loop.description}`),
@@ -1143,6 +1245,7 @@ export class SettlementAgent {
     const loopStatusMap = new Map(nextOpenLoops.loops.map((loop) => [loop.loopId, loop.status] as const));
     const reveals = buildReveals(input, chronologyInsertions, chapterSignals, sceneEvidenceMap, loopStatusMap, mergedSceneDeltas);
     const relationships = buildRelationships(input, sceneEvidenceMap, mergedSceneDeltas);
+    const capabilityResources = buildCapabilityResources(input, sceneEvidenceMap, mergedSceneDeltas);
     const sceneDeltas = enrichSceneDeltas(input, mergedSceneDeltas, loopUpdates, reveals, relationships);
     const themeShift = buildThemeProgressionEntry(input, sceneDeltas);
     const nextThemeProgression: ThemeProgressionLedger = {
@@ -1203,6 +1306,7 @@ export class SettlementAgent {
       reveals,
       relationships,
       themeProgression: nextThemeProgression,
+      capabilityResources,
     };
   }
 }

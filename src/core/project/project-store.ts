@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   BookRecord,
+  CapabilityResourceLedger,
   ChapterStateDelta,
   ChapterDraft,
   ChapterPlan,
@@ -272,10 +273,23 @@ export class ProjectStore {
     });
   }
 
+  async loadCapabilityResources(bookId: string): Promise<CapabilityResourceLedger> {
+    return this.readJsonOrDefault(join(this.storyDir(bookId), "characters", "capability-resource-ledger.json"), {
+      entries: [],
+    });
+  }
+
   async loadRelationshipsBeforeChapter(bookId: string, chapterNumber: number): Promise<RelationshipLedger> {
     const relationships = await this.loadRelationships(bookId);
     return {
       entries: relationships.entries.filter((entry) => entry.lastUpdatedChapter < chapterNumber),
+    };
+  }
+
+  async loadCapabilityResourcesBeforeChapter(bookId: string, chapterNumber: number): Promise<CapabilityResourceLedger> {
+    const capabilityResources = await this.loadCapabilityResources(bookId);
+    return {
+      entries: capabilityResources.entries.filter((entry) => entry.chapterNumber < chapterNumber),
     };
   }
 

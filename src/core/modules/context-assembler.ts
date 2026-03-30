@@ -1,6 +1,7 @@
 import type {
   BookPhaseState,
   BookRecord,
+  CapabilityResourceLedger,
   ChapterSummaryRecord,
   CharacterHistory,
   ChronologyLedger,
@@ -65,6 +66,7 @@ export class ContextAssembler {
     reveals: RevealsLedger;
     relationships: RelationshipLedger;
     themeProgression: ThemeProgressionLedger;
+    capabilityResources: CapabilityResourceLedger;
   }): ContextPack {
     const currentBookPhase = inferBookPhase(input.book, input.targetChapterNumber);
     const recentChapterSummaries = input.chapterSummaries.slice(-3);
@@ -81,6 +83,10 @@ export class ContextAssembler {
       .sort((left, right) => right.lastUpdatedChapter - left.lastUpdatedChapter)
       .slice(0, 4);
     const recentThemeProgression = input.themeProgression.entries.slice(-3);
+    const recentCapabilityResourceStates = input.capabilityResources.entries
+      .slice()
+      .sort((left, right) => right.chapterNumber - left.chapterNumber)
+      .slice(0, 4);
     const chronologySlice = input.chronology.events.slice(-6);
     const relevantCharacterStates = input.characterHistory
       .filter((entry) => entry.latestState.presentInChapter)
@@ -102,6 +108,7 @@ export class ContextAssembler {
       ...recentReveals.slice(-2).map((reveal) => `最近揭示：${reveal.subject} -> ${reveal.revealedTruth}`),
       ...recentRelationshipChanges.slice(0, 2).map((entry) => `最近关系变化：${entry.characters.join(" / ")} -> ${entry.lastChange}`),
       ...recentThemeProgression.slice(-2).map((entry) => `最近主题推进：${entry.primaryTheme} -> ${entry.movementSummary}`),
+      ...recentCapabilityResourceStates.slice(0, 2).map((entry) => `最近能力/资源/状态：${entry.character} -> ${entry.capabilityState}；${entry.resourceState}；${entry.conditionState}`),
       ...chronologySlice.slice(-3).map((event) => `最近事件：${event.summary} -> ${event.consequence}`),
     ];
 
@@ -118,6 +125,9 @@ export class ContextAssembler {
       recentThemeProgression[0]
         ? `最近主题推进显示：${recentThemeProgression[0].movementSummary}；下一章要把它继续转成新的选择压力`
         : "当前没有明确主题账本时，也要避免让主题表达每章重启",
+      recentCapabilityResourceStates[0]
+        ? `最近能力/资源/状态必须连续：${recentCapabilityResourceStates[0].character}当前${recentCapabilityResourceStates[0].capabilityState}；${recentCapabilityResourceStates[0].resourceState}；${recentCapabilityResourceStates[0].conditionState}`
+        : "当前没有明确的能力/资源/状态账本时，也要避免把代价和行动条件写丢",
       relevantCharacterStates[0]
         ? `主视角角色当前最重要的连续状态：欲望=${relevantCharacterStates[0].currentDesire}；误判=${relevantCharacterStates[0].currentMisbelief}`
         : "当前没有足够的角色运行态，请保守承接上一章状态",
@@ -132,6 +142,7 @@ export class ContextAssembler {
       recentReveals,
       recentRelationshipChanges,
       recentThemeProgression,
+      recentCapabilityResourceStates,
       chronologySlice,
       relevantCharacterStates,
       carryForwardFacts,

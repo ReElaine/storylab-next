@@ -55,7 +55,7 @@
 - reveals ledger
 - theme progression
 - world state
-- power state
+- capability/resource/condition state
 - book phase
 
 这层更像“全书数据库”。
