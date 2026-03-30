@@ -13,7 +13,7 @@
 - Phase 1 Settlement Layer 初版：在最终提交链中生成 summary / state delta / chronology / open loops
 - Phase 2 State-Driven Planning 初版：`plan-next` 会先组装 `context-pack`，再基于账本状态规划下一章
 - Phase 3 Continuity Audit 初版：`continuity agent` 已接入最终提交链，continuity fail 时阻止 canonical persist
-  - 当前最小检查项包括：scene coverage、timeline、open loop continuity、tracked character state continuity、可选 `world-rules.json` 规则检查
+  - 当前最小检查项包括：scene coverage、timeline、open loop continuity、reveal continuity、tracked character state continuity、character state drift、open loop contradiction / duplicate loop、可选 `world-rules.json` 规则检查
 
 当前中短期关注的是“单章质量闭环”，但项目已经正式记录了下一条升级路线：
 

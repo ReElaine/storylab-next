@@ -26,6 +26,14 @@ interface ContinuityInput {
 
 const GENERIC_FORCE_SIGNAL = /制度|规则|环境|现实|安全感|危险|资源|局势/u;
 const KEYWORD_SPLIT = /[，。！？；、“”‘’\s:：,.;!?()（）\-]+/u;
+const OPEN_LOOP_SIGNAL = /后续|下章|以后|必须|记恨|打压|断供|危险|报复|安排|后果|隐患|威胁|追查/u;
+const REVEAL_SIGNAL = /真相|秘密|原来|其实|终于知道|终于明白|揭开|说破|暴露|看穿/u;
+const STATE_TRANSITION_SIGNAL = /开始|终于|第一次|不再|转而|转向|意识到|明白|改口|松动|升级|推进/u;
+const HARD_BLOCKING_CODES = new Set<ContinuityIssue["code"]>([
+  "character_state_conflict",
+  "open_loop_conflict",
+  "reveal_conflict",
+]);
 
 function extractKeywords(text: string): ReadonlyArray<string> {
   return Array.from(
@@ -66,6 +74,43 @@ function shouldTrackCharacter(name: string): boolean {
 
 function createIssue(issue: ContinuityIssue): ContinuityIssue {
   return issue;
+}
+
+function keywordOverlap(left: string, right: string): number {
+  const rightKeywords = new Set(extractKeywords(right));
+  return extractKeywords(left).filter((keyword) => rightKeywords.has(keyword)).length;
+}
+
+function normalizeCompactText(text: string): string {
+  return text.replace(KEYWORD_SPLIT, "").trim();
+}
+
+function sharedBigramCount(left: string, right: string): number {
+  const normalizedLeft = normalizeCompactText(left);
+  const normalizedRight = normalizeCompactText(right);
+  if (normalizedLeft.length < 2 || normalizedRight.length < 2) {
+    return 0;
+  }
+
+  const rightBigrams = new Set<string>();
+  for (let index = 0; index < normalizedRight.length - 1; index += 1) {
+    rightBigrams.add(normalizedRight.slice(index, index + 2));
+  }
+
+  let overlap = 0;
+  const counted = new Set<string>();
+  for (let index = 0; index < normalizedLeft.length - 1; index += 1) {
+    const bigram = normalizedLeft.slice(index, index + 2);
+    if (counted.has(bigram)) {
+      continue;
+    }
+    counted.add(bigram);
+    if (rightBigrams.has(bigram)) {
+      overlap += 1;
+    }
+  }
+
+  return overlap;
 }
 
 function detectSceneCoverageIssues(input: ContinuityInput): ReadonlyArray<ContinuityIssue> {
@@ -166,6 +211,7 @@ function detectTimelineIssues(input: ContinuityInput): ReadonlyArray<ContinuityI
 
 function detectCharacterIssues(input: ContinuityInput): ReadonlyArray<ContinuityIssue> {
   const issues: ContinuityIssue[] = [];
+  const chapterSignals = buildChapterSignals(input);
   const currentStates = new Map(
     input.analysis.characterStates
       .filter((character) => character.presentInChapter)
@@ -233,6 +279,64 @@ function detectCharacterIssues(input: ContinuityInput): ReadonlyArray<Continuity
         }),
       );
     }
+
+    const driftDimensions: string[] = [];
+    const compareDimensions = [
+      { label: "欲望", previous: previous.latestState.desire, current: current.desire },
+      { label: "恐惧", previous: previous.latestState.fear, current: current.fear },
+      { label: "误判", previous: previous.latestState.misbelief, current: current.misbelief },
+    ];
+
+    for (const dimension of compareDimensions) {
+      if (dimension.previous.trim().length === 0 || dimension.current.trim().length === 0) {
+        continue;
+      }
+      if (keywordOverlap(dimension.previous, dimension.current) > 0) {
+        continue;
+      }
+
+      const previousMentioned = extractKeywords(dimension.previous).some((keyword) => chapterSignals.includes(keyword));
+      const currentMentioned = extractKeywords(dimension.current).some((keyword) => chapterSignals.includes(keyword));
+      if (previousMentioned && currentMentioned) {
+        continue;
+      }
+
+      driftDimensions.push(dimension.label);
+    }
+
+    if (driftDimensions.length >= 2) {
+      issues.push(
+        createIssue({
+          code: "character_state_conflict",
+          severity: STATE_TRANSITION_SIGNAL.test(chapterSignals) ? "medium" : "high",
+          scope: "state",
+          sceneNumber: null,
+          refs: [name],
+          message: `角色「${name}」的${driftDimensions.join(" / ")}在本章出现了突兀漂移，当前状态和上一章运行态缺少连续桥接。`,
+          recommendation: "要么在正文里补出状态转变过程，要么把当前角色状态收回到与上一章更连续的表达。",
+        }),
+      );
+    }
+
+    if (
+      previous.latestState.arcProgress.trim().length > 0
+      && current.arcProgress.trim().length > 0
+      && keywordOverlap(previous.latestState.arcProgress, current.arcProgress) === 0
+      && !STATE_TRANSITION_SIGNAL.test(current.arcProgress)
+      && !STATE_TRANSITION_SIGNAL.test(chapterSignals)
+    ) {
+      issues.push(
+        createIssue({
+          code: "character_state_conflict",
+          severity: "medium",
+          scope: "state",
+          sceneNumber: null,
+          refs: [name],
+          message: `角色「${name}」的弧线描述从“${previous.latestState.arcProgress}”突然跳到“${current.arcProgress}”，中间缺少过渡。`,
+          recommendation: "给出弧线推进的中间台阶，或在本章正文里明确写出导致弧线转向的事件与代价。",
+        }),
+      );
+    }
   }
 
   return issues;
@@ -288,6 +392,127 @@ function detectOpenLoopIssues(input: ContinuityInput): ReadonlyArray<ContinuityI
         refs: [loop.loopId, ...loop.evidenceRefs],
         message: `旧的 open loop「${loop.description}」在本章没有被明显承接。`,
         recommendation: "确认这条线是否应该延后；如果仍是当前压力点，plan-next 和 writer 应把它显式带进本章。",
+      }),
+    );
+  }
+
+  const activeLoops = input.settlement.openLoops.loops.filter((loop) => loop.status !== "closed");
+  for (let index = 0; index < activeLoops.length; index += 1) {
+    const left = activeLoops[index];
+    for (let compareIndex = index + 1; compareIndex < activeLoops.length; compareIndex += 1) {
+      const right = activeLoops[compareIndex];
+      const rightKeywords = extractKeywords(right.description);
+      const sharedKeywordCount = extractKeywords(left.description).filter((keyword) => rightKeywords.includes(keyword)).length;
+      const sharedPhraseCount = sharedBigramCount(left.description, right.description);
+      const sharedEntities = left.relatedEntities.filter((entity) => right.relatedEntities.includes(entity)).length;
+      if (sharedKeywordCount < 2 && sharedPhraseCount < 4 && sharedEntities === 0) {
+        continue;
+      }
+
+      issues.push(
+        createIssue({
+          code: "open_loop_conflict",
+          severity: "medium",
+          scope: "state",
+          sceneNumber: null,
+          refs: [left.loopId, right.loopId],
+          message: `open loop「${left.description}」和「${right.description}」高度重叠，当前账本看起来重复开线了。`,
+          recommendation: "优先合并为一条既有 loop 的 advanced 状态，而不是继续新开同义压力线。",
+        }),
+      );
+    }
+  }
+
+  const openedUpdates = input.settlement.chapterStateDelta.updatedLoops.filter((loop) => loop.action === "opened");
+  for (const opened of openedUpdates) {
+    const openedKeywords = extractKeywords(opened.description);
+    const similarPrevious = input.previousOpenLoops.loops.find((loop) => {
+      if (loop.status === "closed") {
+        return false;
+      }
+      const sharedKeywordCount = extractKeywords(loop.description).filter((keyword) => openedKeywords.includes(keyword)).length;
+      const sharedPhraseCount = sharedBigramCount(loop.description, opened.description);
+      return sharedKeywordCount >= 2 || sharedPhraseCount >= 4;
+    });
+
+    if (similarPrevious) {
+      issues.push(
+        createIssue({
+          code: "open_loop_conflict",
+          severity: similarPrevious.urgency === "high" ? "high" : "medium",
+          scope: "state",
+          sceneNumber: null,
+          refs: [similarPrevious.loopId, opened.loopId],
+          message: `本章新开的 loop「${opened.description}」与旧 loop「${similarPrevious.description}」高度相似，更像重复开线而不是推进旧线。`,
+          recommendation: "把这条更新记到旧 loop 的 advanced / closed，而不是再开一个新 loopId。",
+        }),
+      );
+    }
+  }
+
+  const closedUpdates = input.settlement.chapterStateDelta.updatedLoops.filter((loop) => loop.action === "closed");
+  for (const closed of closedUpdates) {
+    const stillSignalsFuture = extractKeywords(closed.description).some((keyword) => chapterSignals.includes(keyword))
+      && OPEN_LOOP_SIGNAL.test(chapterSignals);
+    if (!stillSignalsFuture) {
+      continue;
+    }
+
+    issues.push(
+      createIssue({
+        code: "open_loop_conflict",
+        severity: "medium",
+        scope: "state",
+        sceneNumber: null,
+        refs: [closed.loopId],
+        message: `loop「${closed.description}」被记成已关闭，但正文和 settlement 信号仍然在强调后续压力，像是“名义关闭、实际未关闭”。`,
+        recommendation: "确认这条线是真的收束了；如果后续压力还在，应改成 advanced 或拆分为更明确的新后果线。",
+      }),
+    );
+  }
+
+  return issues;
+}
+
+function detectRevealIssues(input: ContinuityInput): ReadonlyArray<ContinuityIssue> {
+  const issues: ContinuityIssue[] = [];
+  const chapterSignals = buildChapterSignals(input);
+  const touchedLoopIds = new Set(input.settlement.chapterStateDelta.updatedLoops.map((loop) => loop.loopId));
+
+  for (const loop of input.previousOpenLoops.loops) {
+    if (loop.status === "closed") {
+      continue;
+    }
+    if (!["mystery", "question", "promise"].includes(loop.type)) {
+      continue;
+    }
+    if (loop.introducedInChapter >= input.chapterNumber) {
+      continue;
+    }
+
+    const keywords = extractKeywords(loop.description);
+    const entities = loop.relatedEntities.filter((entity) => entity.length > 0);
+    const hasLoopSignal = keywords.some((keyword) => chapterSignals.includes(keyword))
+      || entities.some((entity) => chapterSignals.includes(entity));
+    const hasRevealSignal = REVEAL_SIGNAL.test(chapterSignals);
+
+    if (!(hasLoopSignal && hasRevealSignal)) {
+      continue;
+    }
+
+    if (touchedLoopIds.has(loop.loopId)) {
+      continue;
+    }
+
+    issues.push(
+      createIssue({
+        code: "reveal_conflict",
+        severity: loop.expectedPayoffWindow === "soon" ? "high" : "medium",
+        scope: "state",
+        sceneNumber: null,
+        refs: [loop.loopId, ...loop.evidenceRefs],
+        message: `章节看起来已经触及旧谜题/承诺「${loop.description}」，但 settlement 没有把这条线记成 advanced 或 closed。`,
+        recommendation: "如果本章真的推进或揭示了这条线，请在 settlement 中更新 loop 状态；如果没有，请弱化正文里的揭示口吻。",
       }),
     );
   }
@@ -352,6 +577,7 @@ export class ContinuityAgent {
       ...detectSceneCoverageIssues(input),
       ...detectCharacterIssues(input),
       ...detectOpenLoopIssues(input),
+      ...detectRevealIssues(input),
       ...detectWorldRuleIssues(input),
     ].sort((left, right) => {
       const weight = (severity: ContinuityIssue["severity"]): number => {
@@ -362,7 +588,8 @@ export class ContinuityAgent {
       return weight(right.severity) - weight(left.severity);
     });
 
-    const blocking = issues.some((issue) => issue.severity === "high");
+    const blocking = issues.some((issue) => issue.severity === "high"
+      || (issue.severity === "medium" && HARD_BLOCKING_CODES.has(issue.code)));
     const summary = issues.length === 0
       ? "未发现会阻止本章并入全书账本的连续性冲突。"
       : blocking

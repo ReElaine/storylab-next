@@ -285,7 +285,10 @@
     - timeline
     - scene coverage
     - open loop continuity
+    - reveal continuity
     - tracked character state continuity
+    - character state drift
+    - open loop contradiction / duplicate loop
     - 可选 `world-rules.json` 规则检查
 
 但当前还未进入：

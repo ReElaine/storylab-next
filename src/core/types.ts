@@ -270,6 +270,7 @@ export interface ContinuityIssue {
     | "scene_coverage_conflict"
     | "character_state_conflict"
     | "open_loop_conflict"
+    | "reveal_conflict"
     | "world_rule_conflict"
     | "world_rule_check_skipped";
   readonly severity: "low" | "medium" | "high";

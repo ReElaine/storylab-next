@@ -178,6 +178,12 @@ $env:STORYLAB_OPENAI_BASE_URL="https://your-compatible-endpoint/v1"
 - 如果存在该文件，continuity audit 会额外检查：
   - 禁用表达是否出现在正文 / settlement 信号里
   - 某些规则在触发条件成立时，是否出现必须承接的规则信号
+- continuity 现在还会检查最小版 `reveal continuity`
+  - 当旧的 `mystery / question / promise` 看起来已经在正文中被揭示，但 settlement 没有把对应 loop 记成 `advanced / closed` 时，会触发 continuity 问题
+- continuity 还会检查 `character state drift`
+  - 当已跟踪角色的欲望 / 恐惧 / 误判在一章内发生突兀跳变，且正文缺少过渡桥接时，会触发角色状态连续性问题
+- continuity 还会检查 `open loop contradiction / duplicate loop`
+  - 当本章把旧 loop 名义关闭、却继续用正文强化后续压力，或把旧威胁换个名字重复新开时，会触发 loop 矛盾或重复开线问题
 
 导出条件：
 

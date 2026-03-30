@@ -358,7 +358,7 @@ Phase 1 仍然只是“有账可记”的版本，还不是完整全书账本：
 
 当前这版仍然是最小实现，主要作用是先把 continuity gate 建起来，而不是一次性做完整世界规则检查：
 
-- 已接入：scene coverage、timeline、open loop continuity、已跟踪角色状态连续性、最小版 `world-rules.json` 禁用表达 / 必要规则信号检查
+- 已接入：scene coverage、timeline、open loop continuity、reveal continuity、已跟踪角色状态连续性、character state drift、open loop contradiction / duplicate loop、最小版 `world-rules.json` 禁用表达 / 必要规则信号检查
 - 暂时未做：更强的 `world_rules` 语义推理与例外规则解释
 
 ### P1：紧接着做
