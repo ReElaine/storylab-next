@@ -185,6 +185,7 @@ node dist/index.js revise-until-pass <workspaceDir> <bookId> <targetChapterNumbe
 - CLI 会输出阶段进度、reader 分数、修改建议、scene audit 问题和 retry 日志
 - 如果当前版本已经通过 gate，会直接停止，不进入 revise
 - 每一轮 revise 之后，canonical 判定都基于“改后 settlement + 改后 continuity report”
+- re-settlement 会先回到“目标章节之前的 canonical 基线”再 fold 当前章，避免把旧账重复叠加
 
 停止条件：
 

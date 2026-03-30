@@ -753,13 +753,13 @@ export class StorylabRunner {
     draft: ChapterDraft,
     analysis: ChapterAnalysisBundle,
   ): Promise<CanonicalCandidateArtifacts> {
-    this.report("persist", `开始重结算第 ${ctx.chapterNumber} 章候选正文`);
+    this.report("persist", `开始重结算第 ${ctx.chapterNumber} 章候选正文（基于第 ${ctx.chapterNumber - 1} 章前 canonical 基线）`);
 
     const [previousChronology, previousOpenLoops, previousRelationships, previousReveals, worldRules] = await Promise.all([
-      this.store.loadChronology(ctx.bookId),
-      this.store.loadOpenLoops(ctx.bookId),
-      this.store.loadRelationships(ctx.bookId),
-      this.store.loadReveals(ctx.bookId),
+      this.store.loadChronologyBeforeChapter(ctx.bookId, ctx.chapterNumber),
+      this.store.loadOpenLoopsBeforeChapter(ctx.bookId, ctx.chapterNumber),
+      this.store.loadRelationshipsBeforeChapter(ctx.bookId, ctx.chapterNumber),
+      this.store.loadRevealsBeforeChapter(ctx.bookId, ctx.chapterNumber),
       this.store.loadWorldRules(ctx.bookId),
     ]);
 

@@ -382,6 +382,7 @@ Phase 1 仍然只是“有账可记”的版本，还不是完整全书账本：
 - 每一轮 `revise` 后都会重新生成 `continuity report`
 - `revise-cycle / revise-until-pass` 的最终判定，已经基于改后 `continuity` 结果
 - `persist` 只认最后一次 revise 后的状态
+- 当前 re-settlement 已按“目标章节之前的 canonical 基线”回溯再 fold，不再直接叠用当前章节旧账本
 
 当前仍待继续做强：
 

@@ -191,10 +191,28 @@ export class ProjectStore {
     }
   }
 
+  async loadRecentChapterSummariesBeforeChapter(
+    bookId: string,
+    chapterNumber: number,
+    limit = 3,
+  ): Promise<ReadonlyArray<ChapterSummaryRecord>> {
+    const records = await this.loadRecentChapterSummaries(bookId, Number.MAX_SAFE_INTEGER);
+    return records
+      .filter((record) => record.chapterNumber < chapterNumber)
+      .slice(-limit);
+  }
+
   async loadChronology(bookId: string): Promise<ChronologyLedger> {
     return this.readJsonOrDefault(join(this.storyDir(bookId), "plot", "chronology.json"), {
       events: [],
     });
+  }
+
+  async loadChronologyBeforeChapter(bookId: string, chapterNumber: number): Promise<ChronologyLedger> {
+    const chronology = await this.loadChronology(bookId);
+    return {
+      events: chronology.events.filter((event) => event.chapterNumber < chapterNumber),
+    };
   }
 
   async loadOpenLoops(bookId: string): Promise<OpenLoopsLedger> {
@@ -203,16 +221,47 @@ export class ProjectStore {
     });
   }
 
+  async loadOpenLoopsBeforeChapter(bookId: string, chapterNumber: number): Promise<OpenLoopsLedger> {
+    const openLoops = await this.loadOpenLoops(bookId);
+    return {
+      loops: openLoops.loops
+        .filter((loop) => loop.introducedInChapter < chapterNumber)
+        .map((loop) => (
+          loop.lastUpdatedChapter >= chapterNumber
+            ? {
+                ...loop,
+                status: "open" as const,
+                lastUpdatedChapter: chapterNumber - 1,
+              }
+            : loop
+        )),
+    };
+  }
+
   async loadReveals(bookId: string): Promise<RevealsLedger> {
     return this.readJsonOrDefault(join(this.storyDir(bookId), "plot", "reveals-ledger.json"), {
       entries: [],
     });
   }
 
+  async loadRevealsBeforeChapter(bookId: string, chapterNumber: number): Promise<RevealsLedger> {
+    const reveals = await this.loadReveals(bookId);
+    return {
+      entries: reveals.entries.filter((entry) => entry.chapterNumber < chapterNumber),
+    };
+  }
+
   async loadRelationships(bookId: string): Promise<RelationshipLedger> {
     return this.readJsonOrDefault(join(this.storyDir(bookId), "characters", "relationship-ledger.json"), {
       entries: [],
     });
+  }
+
+  async loadRelationshipsBeforeChapter(bookId: string, chapterNumber: number): Promise<RelationshipLedger> {
+    const relationships = await this.loadRelationships(bookId);
+    return {
+      entries: relationships.entries.filter((entry) => entry.lastUpdatedChapter < chapterNumber),
+    };
   }
 
   async loadChapterPlan(bookId: string, chapterNumber: number): Promise<ChapterPlan | null> {

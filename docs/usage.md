@@ -109,6 +109,7 @@ node dist/index.js revise-until-pass ./demo-workspace ember-fall 2 --override --
 - 如果当前版本已经通过 gate，会直接停止并导出最终正文
 - 只有当 reader 过线且不存在硬结构阻断时，才会继续进入 `settlement -> continuity audit -> persist canonical state -> final prose export`
 - 当前 `settlement / continuity audit` 已经会在每一轮 revise 后重跑，最终 persist 只认改后账本
+- 当前 re-settlement 会先回到目标章节之前的 canonical 基线，再合并本章新账本
 - 只有 `continuity audit` 也通过时，才导出 `final/*.txt`
 - 如果达到最大轮次、没有实际改写、或连续一轮没有有效提升，则停止
 - CLI 的进度、retry、reader 分数和建议输出在 `stderr`，JSON 结果输出在 `stdout`

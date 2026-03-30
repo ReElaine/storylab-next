@@ -15,6 +15,7 @@
 - Phase 3 Continuity Audit 初版：`continuity agent` 已接入最终提交链，continuity fail 时阻止 canonical persist
   - 当前最小检查项包括：scene coverage、timeline、open loop continuity、reveal continuity、tracked character state continuity、character state drift、open loop contradiction / duplicate loop、可选 `world-rules.json` 规则检查
 - Phase 4 Re-settlement 初版：每一轮 revise 之后都会重新执行 settlement 与 continuity audit，canonical persist 只认改后账本
+  - 当前 re-settlement 已按“目标章节之前的 canonical 基线”重建，不会把本章旧账再叠一遍
 
 当前中短期关注的是“单章质量闭环”，但项目已经正式记录了下一条升级路线：
 
