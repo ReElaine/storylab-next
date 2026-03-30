@@ -246,6 +246,11 @@ interface CanonicalCandidateArtifacts {
   readonly continuityReportPath: string;
 }
 
+interface CanonicalCandidateOptions {
+  readonly previousChapterStateDelta?: Awaited<ReturnType<ProjectStore["loadChapterStateDelta"]>>;
+  readonly rewrittenSceneNumbers?: ReadonlyArray<number>;
+}
+
 export interface StorylabProgressEvent {
   readonly stage: "plan" | "writer" | "analysis" | "reader" | "revise" | "gate" | "persist" | "continuity" | "loop";
   readonly detail: string;
@@ -330,11 +335,12 @@ export class StorylabRunner {
   async planNext(bookId: string, targetChapterNumber: number): Promise<StorylabPlanResult> {
     await this.store.ensureStoryDirs(bookId);
     this.report("plan", `开始规划第 ${targetChapterNumber} 章`);
-    const [book, styleGuide, characterHistory, themeHistory, storyMemory, chapterSummaries, chronology, openLoops, reveals, relationships, gates] = await Promise.all([
+    const [book, styleGuide, characterHistory, themeHistory, themeProgression, storyMemory, chapterSummaries, chronology, openLoops, reveals, relationships, gates] = await Promise.all([
       this.store.loadBook(bookId),
       this.store.loadStyleGuide(bookId),
       this.store.loadCharacterHistory(bookId),
       this.store.loadThemeHistory(bookId),
+      this.store.loadThemeProgression(bookId),
       this.store.loadStoryMemory(bookId),
       this.store.loadRecentChapterSummaries(bookId, 3),
       this.store.loadChronology(bookId),
@@ -353,6 +359,7 @@ export class StorylabRunner {
       openLoops,
       reveals,
       relationships,
+      themeProgression,
     });
 
     const contextPackPath = await this.store.writeOutput(
@@ -752,14 +759,16 @@ export class StorylabRunner {
     ctx: RevisionPassContext,
     draft: ChapterDraft,
     analysis: ChapterAnalysisBundle,
+    options?: CanonicalCandidateOptions,
   ): Promise<CanonicalCandidateArtifacts> {
     this.report("persist", `开始重结算第 ${ctx.chapterNumber} 章候选正文（基于第 ${ctx.chapterNumber - 1} 章前 canonical 基线）`);
 
-    const [previousChronology, previousOpenLoops, previousRelationships, previousReveals, worldRules] = await Promise.all([
+    const [previousChronology, previousOpenLoops, previousRelationships, previousReveals, previousThemeProgression, worldRules] = await Promise.all([
       this.store.loadChronologyBeforeChapter(ctx.bookId, ctx.chapterNumber),
       this.store.loadOpenLoopsBeforeChapter(ctx.bookId, ctx.chapterNumber),
       this.store.loadRelationshipsBeforeChapter(ctx.bookId, ctx.chapterNumber),
       this.store.loadRevealsBeforeChapter(ctx.bookId, ctx.chapterNumber),
+      this.store.loadThemeProgressionBeforeChapter(ctx.bookId, ctx.chapterNumber),
       this.store.loadWorldRules(ctx.bookId),
     ]);
 
@@ -771,6 +780,9 @@ export class StorylabRunner {
       previousChronology,
       previousOpenLoops,
       previousRelationships,
+      previousThemeProgression,
+      previousChapterStateDelta: options?.previousChapterStateDelta ?? null,
+      rewrittenSceneNumbers: options?.rewrittenSceneNumbers ?? [],
     });
 
     this.report("continuity", `开始跨章连续性审计：第 ${ctx.chapterNumber} 章候选正文`);
@@ -967,7 +979,11 @@ export class StorylabRunner {
     );
     const afterSceneAudit = this.sceneAuditor.audit(ctx.plan.sceneBlueprint, afterAnalysis.scenes, revisedDraft.content);
     const postRevisionGate = buildBlockingGateStatus({ analysis: afterAnalysis, sceneAudit: afterSceneAudit });
-    const afterCandidate = await this.evaluateCanonicalCandidate(ctx, revisedDraft, afterAnalysis);
+    const previousChapterStateDelta = await this.store.loadChapterStateDelta(ctx.bookId, ctx.chapterNumber);
+    const afterCandidate = await this.evaluateCanonicalCandidate(ctx, revisedDraft, afterAnalysis, {
+      previousChapterStateDelta,
+      rewrittenSceneNumbers: revisionResult.trace.actualRewrittenSceneNumbers,
+    });
     const afterContinuity = afterCandidate.continuityReport;
     this.report("gate", `修订后 gate blocking=${postRevisionGate.blocking}`);
     this.report("gate", `修订后 blocking reasons=${formatReasons(postRevisionGate.reasons)}`);
@@ -1196,7 +1212,7 @@ export class StorylabRunner {
       previousMemory: ctx.previousMemory,
     });
 
-    const [chapterSummaryPath, stateDeltaPath, chronologyPath, openLoopsPath, revealsPath, relationshipsPath, finalProsePath] = await Promise.all([
+    const [chapterSummaryPath, stateDeltaPath, chronologyPath, openLoopsPath, revealsPath, relationshipsPath, themeProgressionPath, finalProsePath] = await Promise.all([
       this.store.writeOutput(
         ctx.bookId,
         "settlement",
@@ -1233,9 +1249,15 @@ export class StorylabRunner {
         "relationship-ledger.json",
         JSON.stringify(settlement.relationships, null, 2),
       ),
+      this.store.writeOutput(
+        ctx.bookId,
+        "themes",
+        "theme-progression.json",
+        JSON.stringify(settlement.themeProgression, null, 2),
+      ),
       this.store.writeFinalProse(ctx.bookId, draft),
     ]);
-    this.report("persist", `第 ${ctx.chapterNumber} 章 settlement 已写回 summary/state-delta/chronology/open-loops/reveals/relationships`);
+    this.report("persist", `第 ${ctx.chapterNumber} 章 settlement 已写回 summary/state-delta/chronology/open-loops/reveals/relationships/theme-progression`);
 
     return {
       continuityReportPath,
@@ -1247,6 +1269,7 @@ export class StorylabRunner {
         openLoopsPath,
         revealsPath,
         relationshipsPath,
+        themeProgressionPath,
       },
       finalProsePath,
     };

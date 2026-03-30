@@ -13,6 +13,7 @@ test("project store can load canonical state before a target chapter", async () 
     await Promise.all([
       mkdir(join(storyDir, "plot"), { recursive: true }),
       mkdir(join(storyDir, "characters"), { recursive: true }),
+      mkdir(join(storyDir, "themes"), { recursive: true }),
       mkdir(join(storyDir, "settlement"), { recursive: true }),
     ]);
 
@@ -127,6 +128,38 @@ test("project store can load canonical state before a target chapter", async () 
         "utf-8",
       ),
       writeFile(
+        join(storyDir, "themes", "theme-progression.json"),
+        JSON.stringify({
+          entries: [
+            {
+              chapterNumber: 1,
+              primaryTheme: "反抗有代价",
+              antiTheme: "低头就能换安全",
+              thematicQuestion: "反抗后代价是否会持续升级？",
+              movementSummary: "第一章建立了短期胜利后的制度性后果。",
+              stance: "toward_theme",
+              pressurePoint: "短期胜利后，代价必须落地。",
+              carrierCharacters: ["林凡", "赵执事"],
+              supportingSceneNumbers: [3, 4],
+              evidenceRefs: ["scene-3", "scene-4"],
+            },
+            {
+              chapterNumber: 3,
+              primaryTheme: "真相有代价",
+              antiTheme: "停下就能保平安",
+              thematicQuestion: "追查真相是否值得持续付代价？",
+              movementSummary: "第三章把真相线推进到了更危险的位置。",
+              stance: "toward_theme",
+              pressurePoint: "真相越近越危险。",
+              carrierCharacters: ["林凡"],
+              supportingSceneNumbers: [1],
+              evidenceRefs: ["scene-1"],
+            },
+          ],
+        }, null, 2),
+        "utf-8",
+      ),
+      writeFile(
         join(storyDir, "settlement", "chapter-0001.chapter-summary.json"),
         JSON.stringify({ chapterNumber: 1, title: "第一章", summary: "第一章摘要", keyEvents: [], changedCharacters: [], openedLoopIds: [], advancedLoopIds: [], closedLoopIds: [] }, null, 2),
         "utf-8",
@@ -144,17 +177,19 @@ test("project store can load canonical state before a target chapter", async () 
     ]);
 
     const store = new ProjectStore(workspaceRoot);
-    const [chronology, openLoops, reveals, relationships, summaries] = await Promise.all([
+    const [chronology, openLoops, reveals, relationships, themeProgression, summaries] = await Promise.all([
       store.loadChronologyBeforeChapter(bookId, 3),
       store.loadOpenLoopsBeforeChapter(bookId, 3),
       store.loadRevealsBeforeChapter(bookId, 3),
       store.loadRelationshipsBeforeChapter(bookId, 3),
+      store.loadThemeProgressionBeforeChapter(bookId, 3),
       store.loadRecentChapterSummariesBeforeChapter(bookId, 3, 5),
     ]);
 
     assert.deepEqual(chronology.events.map((event) => event.chapterNumber), [1, 2]);
     assert.deepEqual(reveals.entries.map((entry) => entry.chapterNumber), [2]);
     assert.deepEqual(relationships.entries.map((entry) => entry.lastUpdatedChapter), [2]);
+    assert.deepEqual(themeProgression.entries.map((entry) => entry.chapterNumber), [1]);
     assert.deepEqual(summaries.map((entry) => entry.chapterNumber), [1, 2]);
     assert.equal(openLoops.loops.length, 1);
     assert.equal(openLoops.loops[0].loopId, "loop-1");

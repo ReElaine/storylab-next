@@ -12,8 +12,11 @@ import type {
   RelationshipLedgerEntry,
   RevealEntry,
   RevealsLedger,
+  SceneStateDelta,
   SceneBlueprintItem,
   SettlementBundle,
+  ThemeProgressionEntry,
+  ThemeProgressionLedger,
 } from "../types.js";
 import { parseSceneDocument } from "../utils/scene-text.js";
 
@@ -25,6 +28,9 @@ interface SettlementInput {
   readonly previousChronology: ChronologyLedger;
   readonly previousOpenLoops: OpenLoopsLedger;
   readonly previousRelationships?: RelationshipLedger;
+  readonly previousThemeProgression?: ThemeProgressionLedger;
+  readonly previousChapterStateDelta?: ChapterStateDelta | null;
+  readonly rewrittenSceneNumbers?: ReadonlyArray<number>;
 }
 
 const OPEN_LOOP_SIGNAL = /会|将|后续|下月|以后|下一章|必须|不得不|记恨|打压|断供|危险|真相|秘密|悬念|报复|安排|盯上|后果|隐患|威胁|追查/u;
@@ -777,6 +783,166 @@ function buildRelationships(
   };
 }
 
+function buildRawSceneDeltas(
+  input: SettlementInput,
+  chronologyInsertions: ReadonlyArray<ChronologyEvent>,
+): ReadonlyArray<SceneStateDelta> {
+  return chronologyInsertions.map((event) => {
+    const planScene = input.plan.sceneBlueprint.find((scene) => scene.sceneNumber === event.sceneNumber);
+    return {
+      sceneNumber: event.sceneNumber ?? 0,
+      sceneId: event.sceneId,
+      sceneAnchor: planScene?.sceneAnchor,
+      actors: event.actors,
+      summary: event.summary,
+      consequence: event.consequence,
+      stateHighlights: uniqueStrings([
+        `${event.summary} -> ${event.consequence}`,
+        planScene?.decision ? `决策：${planScene.decision}` : "",
+        planScene?.cost ? `代价：${planScene.cost}` : "",
+        planScene?.relationshipChange ? `关系：${planScene.relationshipChange}` : "",
+      ]).slice(0, 4),
+      loopIds: [],
+      revealIds: [],
+      relationshipIds: [],
+      themeBeat: trimSentence(planScene?.thematicTension ?? input.plan.themeIntent, 72),
+    } satisfies SceneStateDelta;
+  });
+}
+
+function mergeSceneDeltas(
+  currentSceneDeltas: ReadonlyArray<SceneStateDelta>,
+  previousChapterStateDelta: ChapterStateDelta | null | undefined,
+  rewrittenSceneNumbers: ReadonlyArray<number> | undefined,
+): ReadonlyArray<SceneStateDelta> {
+  if (!previousChapterStateDelta?.sceneDeltas || previousChapterStateDelta.sceneDeltas.length === 0) {
+    return currentSceneDeltas;
+  }
+  if (!rewrittenSceneNumbers || rewrittenSceneNumbers.length === 0) {
+    return currentSceneDeltas;
+  }
+
+  const rewritten = new Set(rewrittenSceneNumbers);
+  const previousByScene = new Map(
+    previousChapterStateDelta.sceneDeltas.map((sceneDelta) => [sceneDelta.sceneNumber, sceneDelta] as const),
+  );
+
+  return currentSceneDeltas.map((sceneDelta) => (
+    rewritten.has(sceneDelta.sceneNumber) || !previousByScene.has(sceneDelta.sceneNumber)
+      ? sceneDelta
+      : previousByScene.get(sceneDelta.sceneNumber) ?? sceneDelta
+  ));
+}
+
+function chronologyFromSceneDeltas(sceneDeltas: ReadonlyArray<SceneStateDelta>, chapterNumber: number): ReadonlyArray<ChronologyEvent> {
+  return sceneDeltas.map((sceneDelta) => ({
+    eventId: `ch${String(chapterNumber).padStart(4, "0")}-scene-${sceneDelta.sceneNumber}`,
+    chapterNumber,
+    sceneNumber: sceneDelta.sceneNumber,
+    sceneId: sceneDelta.sceneId,
+    actors: sceneDelta.actors,
+    summary: sceneDelta.summary,
+    consequence: sceneDelta.consequence,
+  }));
+}
+
+function enrichSceneDeltas(
+  input: SettlementInput,
+  sceneDeltas: ReadonlyArray<SceneStateDelta>,
+  loopUpdates: ReadonlyArray<ChapterStateDelta["updatedLoops"][number]>,
+  reveals: RevealsLedger,
+  relationships: RelationshipLedger,
+): ReadonlyArray<SceneStateDelta> {
+  const currentRelationshipEntries = relationships.entries.filter((entry) => entry.lastUpdatedChapter === input.chapterNumber);
+
+  return sceneDeltas.map((sceneDelta) => {
+    const sceneRef = `scene-${sceneDelta.sceneNumber}`;
+    const planScene = input.plan.sceneBlueprint.find((scene) => scene.sceneNumber === sceneDelta.sceneNumber);
+    return {
+      ...sceneDelta,
+      loopIds: loopUpdates
+        .filter((loop) => loop.evidence.includes(sceneRef))
+        .map((loop) => loop.loopId),
+      revealIds: reveals.entries
+        .filter((entry) => entry.sceneNumber === sceneDelta.sceneNumber)
+        .map((entry) => entry.revealId),
+      relationshipIds: currentRelationshipEntries
+        .filter((entry) => entry.evidenceRefs.includes(sceneRef))
+        .map((entry) => entry.relationshipId),
+      stateHighlights: uniqueStrings([
+        ...sceneDelta.stateHighlights,
+        ...loopUpdates
+          .filter((loop) => loop.evidence.includes(sceneRef))
+          .map((loop) => `${loop.action}:${loop.description}`),
+      ]).slice(0, 5),
+      themeBeat: trimSentence(planScene?.thematicTension ?? sceneDelta.themeBeat, 72),
+    } satisfies SceneStateDelta;
+  });
+}
+
+function inferThemeStance(
+  primaryTheme: string,
+  antiTheme: string,
+  activeTheme: ChapterAnalysisBundle["themeReport"]["activeThemes"][number] | undefined,
+  movementSummary: string,
+): ThemeProgressionEntry["stance"] {
+  if (activeTheme) {
+    if (activeTheme.themeSignalCount > activeTheme.antiSignalCount) {
+      return "toward_theme";
+    }
+    if (activeTheme.antiSignalCount > activeTheme.themeSignalCount) {
+      return "toward_anti_theme";
+    }
+  }
+
+  if (movementSummary.includes(primaryTheme) && !movementSummary.includes(antiTheme)) {
+    return "toward_theme";
+  }
+  if (movementSummary.includes(antiTheme) && !movementSummary.includes(primaryTheme)) {
+    return "toward_anti_theme";
+  }
+  return "mixed";
+}
+
+function buildThemeProgressionEntry(
+  input: SettlementInput,
+  sceneDeltas: ReadonlyArray<SceneStateDelta>,
+): ThemeProgressionEntry {
+  const activeTheme = input.analysis.themeReport.activeThemes[0];
+  const primaryTheme = activeTheme?.theme ?? input.plan.sceneBlueprint[0]?.valuePositionA ?? "反抗有代价";
+  const antiTheme = activeTheme?.antiTheme ?? input.plan.sceneBlueprint[0]?.valuePositionB ?? "力量可以无损获得";
+  const thematicQuestion = input.plan.thematicQuestion;
+  const movementSummary = trimSentence(
+    activeTheme?.interpretation
+      ?? `${primaryTheme} 在本章通过 ${sceneDeltas.slice(0, 2).map((sceneDelta) => sceneDelta.summary).join("；")} 被继续推进。`,
+    96,
+  );
+  const pressurePoint = trimSentence(
+    input.plan.sceneBlueprint.at(-1)?.thematicTension
+      ?? input.plan.themeIntent
+      ?? movementSummary,
+    72,
+  );
+  const carrierCharacters = uniqueStrings(
+    input.plan.sceneBlueprint
+      .map((scene) => scene.drivingCharacter)
+      .filter((name) => name.trim().length > 0),
+  ).slice(0, 4);
+
+  return {
+    chapterNumber: input.chapterNumber,
+    primaryTheme,
+    antiTheme,
+    thematicQuestion,
+    movementSummary,
+    stance: inferThemeStance(primaryTheme, antiTheme, activeTheme, movementSummary),
+    pressurePoint,
+    carrierCharacters,
+    supportingSceneNumbers: sceneDeltas.map((sceneDelta) => sceneDelta.sceneNumber),
+    evidenceRefs: sceneDeltas.map((sceneDelta) => `scene-${sceneDelta.sceneNumber}`),
+  };
+}
+
 function summarizeChangedCharacters(input: SettlementInput): ChapterSummaryRecord["changedCharacters"] {
   return input.analysis.characterStates
     .filter((state) => state.presentInChapter)
@@ -791,7 +957,13 @@ function summarizeChangedCharacters(input: SettlementInput): ChapterSummaryRecor
 export class SettlementAgent {
   settle(input: SettlementInput): SettlementBundle {
     const sceneEvidenceMap = buildSceneEvidenceMap(input);
-    const chronologyInsertions = buildChronologyInsertions(input, sceneEvidenceMap);
+    const currentChronologyInsertions = buildChronologyInsertions(input, sceneEvidenceMap);
+    const mergedSceneDeltas = mergeSceneDeltas(
+      buildRawSceneDeltas(input, currentChronologyInsertions),
+      input.previousChapterStateDelta,
+      input.rewrittenSceneNumbers,
+    );
+    const chronologyInsertions = chronologyFromSceneDeltas(mergedSceneDeltas, input.chapterNumber);
     const nextChronology: ChronologyLedger = {
       events: [...input.previousChronology.events, ...chronologyInsertions],
     };
@@ -835,6 +1007,14 @@ export class SettlementAgent {
     const loopStatusMap = new Map(nextOpenLoops.loops.map((loop) => [loop.loopId, loop.status] as const));
     const reveals = buildReveals(input, chronologyInsertions, chapterSignals, sceneEvidenceMap, loopStatusMap);
     const relationships = buildRelationships(input, sceneEvidenceMap);
+    const sceneDeltas = enrichSceneDeltas(input, mergedSceneDeltas, loopUpdates, reveals, relationships);
+    const themeShift = buildThemeProgressionEntry(input, sceneDeltas);
+    const nextThemeProgression: ThemeProgressionLedger = {
+      entries: [
+        ...(input.previousThemeProgression?.entries ?? []),
+        themeShift,
+      ],
+    };
 
     const openedLoopIds = loopUpdates.filter((loop) => loop.action === "opened").map((loop) => loop.loopId);
     const advancedLoopIds = loopUpdates.filter((loop) => loop.action === "advanced").map((loop) => loop.loopId);
@@ -865,13 +1045,17 @@ export class SettlementAgent {
           arcProgress: state.arcProgress,
           summary: trimSentence(`${state.name}做出“${state.recentDecision}”，代价是“${state.decisionCost}”`, 96),
         })),
+      sceneDeltas,
       chronologyInsertions,
       updatedLoops: loopUpdates,
+      themeShift,
       stateHighlights: uniqueStrings([
         ...input.analysis.characterStates
           .filter((state) => state.presentInChapter)
           .map((state) => `${state.name}: ${state.arcProgress}`),
         ...loopUpdates.map((loop) => `${loop.action}:${loop.description}`),
+        ...sceneDeltas.flatMap((sceneDelta) => sceneDelta.stateHighlights),
+        `theme:${themeShift.movementSummary}`,
       ]).slice(0, 8),
     };
 
@@ -882,6 +1066,7 @@ export class SettlementAgent {
       openLoops: nextOpenLoops,
       reveals,
       relationships,
+      themeProgression: nextThemeProgression,
     };
   }
 }

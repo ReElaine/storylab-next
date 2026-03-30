@@ -106,6 +106,22 @@ test("context assembler builds a state-driven planning pack from summaries, chro
         },
       ],
     },
+    themeProgression: {
+      entries: [
+        {
+          chapterNumber: 1,
+          primaryTheme: "反抗有代价",
+          antiTheme: "低头就能换安全",
+          thematicQuestion: "第一次反抗之后，代价会不会继续升级？",
+          movementSummary: "主角已经发现，反抗带来的不是一次性胜利，而是持续的制度性反扑。",
+          stance: "toward_theme",
+          pressurePoint: "短期胜利之后，代价必须继续落地。",
+          carrierCharacters: ["林凡", "赵执事"],
+          supportingSceneNumbers: [3, 4],
+          evidenceRefs: ["scene-3", "scene-4"],
+        },
+      ],
+    },
   });
 
   assert.equal(contextPack.taskType, "plan-next");
@@ -114,10 +130,13 @@ test("context assembler builds a state-driven planning pack from summaries, chro
   assert.equal(contextPack.activeOpenLoops[0].loopId, "loop-ch0001-01");
   assert.equal(contextPack.recentReveals[0].revealId, "reveal-ch0001-01");
   assert.equal(contextPack.recentRelationshipChanges[0].relationshipId, "linfan::zhao");
+  assert.equal(contextPack.recentThemeProgression[0].chapterNumber, 1);
   assert.equal(contextPack.relevantCharacterStates[0].name, "林凡");
   assert.ok(contextPack.carryForwardFacts.some((item) => item.includes("林凡当众夺回灵石")));
   assert.ok(contextPack.carryForwardFacts.some((item) => item.includes("最近揭示")));
   assert.ok(contextPack.carryForwardFacts.some((item) => item.includes("最近关系变化")));
+  assert.ok(contextPack.carryForwardFacts.some((item) => item.includes("最近主题推进")));
   assert.ok(contextPack.planningFocus.some((item) => item.includes("最近揭示")));
   assert.ok(contextPack.planningFocus.some((item) => item.includes("关系变化")));
+  assert.ok(contextPack.planningFocus.some((item) => item.includes("主题推进")));
 });

@@ -309,11 +309,11 @@
   - 每一轮 revise 后都会重跑 continuity audit
   - canonical persist 只认改后账本
 
-但当前仍未完成：
+但当前仍待继续做强：
 
-- theme progression 的完整账本
-- scene 增量重结算
-- 更细的 canonical delta merge
+- theme progression 目前是初版账本，已进入 `settlement -> context-pack -> plan-next`
+- scene 级增量重结算已接入，但仍是“按 scene delta 复用/重算”的第一版
+- 更细的 canonical delta merge 已接入初版，后续仍可继续细化合并策略
 
 这条路线当前已经不只是“立项记录”，而是：
 

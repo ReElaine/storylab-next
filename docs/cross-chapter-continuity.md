@@ -244,7 +244,7 @@
 
 1. 还没有完整的 canonical book-state
 2. 还没有更强的 world/theme/book phase 账本
-3. 还没有 scene 增量重结算
+3. scene 增量重结算已经接入初版，但还没有做到更细粒度的 scene output-state fold
 
 换句话说：
 
@@ -286,12 +286,12 @@
 
 ### 当前边界
 
-Phase 1 仍然只是“有账可记”的版本，还不是完整全书账本：
+Phase 1 / Phase 4 当前已经进入“账本可用、改后可重结算”的版本，但还不是完整全书账本：
 
-- theme progression 暂未接入
-- scene 增量结算还未开始
+- `theme progression` 已接入初版账本，并进入 `context-pack -> plan-next`
+- scene 级增量重结算已接入初版：未改 scene 优先复用旧 `sceneDeltas`，改动 scene 重新结算
 - 更高阶的 continuity 语义推理还未建立
-- 更细粒度的 revise 后增量重结算还未建立
+- 更细粒度的 revise 后增量 merge 仍可继续深化
 
 ## 推荐总链路
 
@@ -386,16 +386,16 @@ Phase 1 仍然只是“有账可记”的版本，还不是完整全书账本：
 
 当前仍待继续做强：
 
-- scene 增量重结算
-- 更细粒度的 canonical delta merge
+- scene 增量重结算从“scene delta 复用/重算”升级到更细的 scene output-state fold
+- 更细粒度的 canonical delta merge 策略
 - 更清晰的 re-settlement / re-audit 调试视图
 
 #### 5. 补更完整的全书账本
 
 优先顺序建议：
 
-1. theme progression
-2. world state / book phase
+1. world state / book phase
+2. 更细的 scene delta merge / output-state fold
 
 ### P2：高级优化
 

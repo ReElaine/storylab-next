@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   BookRecord,
+  ChapterStateDelta,
   ChapterDraft,
   ChapterPlan,
   ChapterSummaryRecord,
@@ -16,6 +17,7 @@ import type {
   StoryMemory,
   StyleGuide,
   ThemeHistory,
+  ThemeProgressionLedger,
   ThemeSeed,
   WorldRulesConfig,
 } from "../types.js";
@@ -163,6 +165,19 @@ export class ProjectStore {
     return this.readJsonOrDefault(join(this.storyDir(bookId), "themes", "theme-history.json"), { timeline: [] });
   }
 
+  async loadThemeProgression(bookId: string): Promise<ThemeProgressionLedger> {
+    return this.readJsonOrDefault(join(this.storyDir(bookId), "themes", "theme-progression.json"), {
+      entries: [],
+    });
+  }
+
+  async loadThemeProgressionBeforeChapter(bookId: string, chapterNumber: number): Promise<ThemeProgressionLedger> {
+    const themeProgression = await this.loadThemeProgression(bookId);
+    return {
+      entries: themeProgression.entries.filter((entry) => entry.chapterNumber < chapterNumber),
+    };
+  }
+
   async loadStoryMemory(bookId: string): Promise<StoryMemory> {
     return this.readJsonOrDefault(join(this.storyDir(bookId), "memory", "story-memory.json"), {
       lastAnalyzedChapter: 0,
@@ -267,6 +282,13 @@ export class ProjectStore {
   async loadChapterPlan(bookId: string, chapterNumber: number): Promise<ChapterPlan | null> {
     return this.readJsonOrDefault<ChapterPlan | null>(
       join(this.storyDir(bookId), "planning", this.chapterFileName(chapterNumber, "chapter-plan.json")),
+      null,
+    );
+  }
+
+  async loadChapterStateDelta(bookId: string, chapterNumber: number): Promise<ChapterStateDelta | null> {
+    return this.readJsonOrDefault<ChapterStateDelta | null>(
+      join(this.storyDir(bookId), "settlement", this.chapterFileName(chapterNumber, "chapter-state-delta.json")),
       null,
     );
   }

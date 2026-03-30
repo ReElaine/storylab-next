@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { ChapterPlanner } from "../dist/core/modules/chapter-planner.js";
 
-test("chapter planner uses open loops and chapter summaries to build the next mission", () => {
+test("chapter planner uses reveals, relationships, and theme progression to build the next mission", () => {
   const planner = new ChapterPlanner();
   const plan = planner.planNextChapter(
     2,
@@ -13,7 +13,7 @@ test("chapter planner uses open loops and chapter summaries to build the next mi
           name: "林凡",
           desire: "改变命运",
           fear: "继续被打压",
-          misbelief: "只要忍耐就能熬过去",
+          misbelief: "只要再忍一忍就能熬过去",
           recentDecision: "当众反抗",
           decisionCost: "赵执事记恨并准备断供",
           relationshipShift: ["与赵执事对立"],
@@ -120,19 +120,37 @@ test("chapter planner uses open loops and chapter summaries to build the next mi
         },
       ],
     },
+    {
+      entries: [
+        {
+          chapterNumber: 1,
+          primaryTheme: "反抗有代价",
+          antiTheme: "低头就能换安全",
+          thematicQuestion: "第一次反抗之后，代价会不会继续升级？",
+          movementSummary: "主角已经意识到，反抗后的代价会持续升级，而不是一次性过去。",
+          stance: "toward_theme",
+          pressurePoint: "短期胜利之后，代价必须继续落地。",
+          carrierCharacters: ["林凡", "赵执事"],
+          supportingSceneNumbers: [3, 4],
+          evidenceRefs: ["scene-3", "scene-4"],
+        },
+      ],
+    },
     [],
     {
       narrativeVoice: "直接",
       dialogueRule: "锋利",
       sentenceRhythm: "快",
       descriptionDensity: "低",
-      paragraphStrategy: "优先动作与对白",
+      paragraphStrategy: "优先动作与对话",
     },
   );
 
   assert.ok(plan.chapterMission.includes("赵执事的打压方式"));
-  assert.ok(plan.chapterMission.includes("断供"));
-  assert.ok(plan.sceneBlueprint[0].goal.includes("真相已明确"));
+  assert.ok(plan.chapterMission.includes("揭示"));
+  assert.ok(plan.themeIntent.includes("反抗有代价"));
+  assert.ok(plan.thematicQuestion.includes("代价"));
+  assert.ok(plan.sceneBlueprint[0].thematicTension.includes("代价"));
+  assert.ok(plan.sceneBlueprint[0].relationshipChange.includes("对立"));
   assert.ok(plan.gateNote.includes("最近揭示"));
-  assert.ok(plan.sceneBlueprint[0].relationshipChange.includes("公开对立"));
 });

@@ -40,6 +40,7 @@ export class HeuristicPlanningEngine implements PlanningEngine {
       { loops: input.contextPack.activeOpenLoops },
       { entries: input.contextPack.recentReveals },
       { entries: input.contextPack.recentRelationshipChanges },
+      { entries: input.contextPack.recentThemeProgression },
       input.gates,
       input.styleGuide,
     );

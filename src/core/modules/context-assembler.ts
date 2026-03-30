@@ -8,6 +8,7 @@ import type {
   OpenLoopsLedger,
   RelationshipLedger,
   RevealsLedger,
+  ThemeProgressionLedger,
 } from "../types.js";
 
 function inferBookPhase(book: BookRecord, targetChapterNumber: number): BookPhaseState {
@@ -63,6 +64,7 @@ export class ContextAssembler {
     openLoops: OpenLoopsLedger;
     reveals: RevealsLedger;
     relationships: RelationshipLedger;
+    themeProgression: ThemeProgressionLedger;
   }): ContextPack {
     const currentBookPhase = inferBookPhase(input.book, input.targetChapterNumber);
     const recentChapterSummaries = input.chapterSummaries.slice(-3);
@@ -78,6 +80,7 @@ export class ContextAssembler {
       .slice()
       .sort((left, right) => right.lastUpdatedChapter - left.lastUpdatedChapter)
       .slice(0, 4);
+    const recentThemeProgression = input.themeProgression.entries.slice(-3);
     const chronologySlice = input.chronology.events.slice(-6);
     const relevantCharacterStates = input.characterHistory
       .filter((entry) => entry.latestState.presentInChapter)
@@ -98,6 +101,7 @@ export class ContextAssembler {
       ...activeOpenLoops.slice(0, 3).map((loop) => `未兑现事项：${loop.description}`),
       ...recentReveals.slice(-2).map((reveal) => `最近揭示：${reveal.subject} -> ${reveal.revealedTruth}`),
       ...recentRelationshipChanges.slice(0, 2).map((entry) => `最近关系变化：${entry.characters.join(" / ")} -> ${entry.lastChange}`),
+      ...recentThemeProgression.slice(-2).map((entry) => `最近主题推进：${entry.primaryTheme} -> ${entry.movementSummary}`),
       ...chronologySlice.slice(-3).map((event) => `最近事件：${event.summary} -> ${event.consequence}`),
     ];
 
@@ -111,6 +115,9 @@ export class ContextAssembler {
       recentRelationshipChanges[0]
         ? `最近关系变化需要继续滚动：${recentRelationshipChanges[0].characters.join(" / ")} -> ${recentRelationshipChanges[0].lastChange}`
         : "当前没有高优先级关系变化时，也要避免把已紧张的关系写回初始状态",
+      recentThemeProgression[0]
+        ? `最近主题推进显示：${recentThemeProgression[0].movementSummary}；下一章要把它继续转成新的选择压力`
+        : "当前没有明确主题账本时，也要避免让主题表达每章重启",
       relevantCharacterStates[0]
         ? `主视角角色当前最重要的连续状态：欲望=${relevantCharacterStates[0].currentDesire}；误判=${relevantCharacterStates[0].currentMisbelief}`
         : "当前没有足够的角色运行态，请保守承接上一章状态",
@@ -124,6 +131,7 @@ export class ContextAssembler {
       activeOpenLoops,
       recentReveals,
       recentRelationshipChanges,
+      recentThemeProgression,
       chronologySlice,
       relevantCharacterStates,
       carryForwardFacts,

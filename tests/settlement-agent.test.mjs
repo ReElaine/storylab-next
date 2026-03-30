@@ -2,14 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { SettlementAgent } from "../dist/core/modules/settlement-agent.js";
 
-test("settlement agent produces summary, state delta, chronology, and open loops", () => {
+test("settlement agent produces summary, state delta, chronology, open loops, and theme progression", () => {
   const agent = new SettlementAgent();
   const result = agent.settle({
     chapterNumber: 1,
     draft: {
       chapterNumber: 1,
       title: "第一次反抗",
-      content: "林凡当众夺回灵石，赵执事因此记恨，后续资源可能被断供。",
+      content: "林凡当众夺回灵石。赵执事当场记恨，并放话后续要断供打压。",
       summary: "工作稿",
       basedOnPlan: 1,
     },
@@ -20,20 +20,20 @@ test("settlement agent produces summary, state delta, chronology, and open loops
       sceneBlueprint: [
         {
           sceneId: "scene-1",
-          sceneAnchor: "scene-1-林凡",
+          sceneAnchor: "scene-1-linfan",
           sceneNumber: 1,
           pov: "林凡",
           goal: "在资源分发中建立不公",
-          conflict: "陈师兄与赵执事联手压制",
-          turn: "林凡意识到继续忍耐只会失去最后的资源",
-          result: "林凡当众出手，夺回灵石，但被赵执事记恨",
+          conflict: "陈师兄与赵执事联手压人",
+          turn: "林凡意识到继续忍只会失去最后一块灵石",
+          result: "林凡当众夺回灵石，但被赵执事记恨",
           newInformation: ["赵执事会在后续资源上打压林凡"],
           emotionalShift: "压抑 -> 爆发",
           drivingCharacter: "林凡",
           opposingForce: "赵执事",
           decision: "当众反抗",
           cost: "后续资源被断供",
-          relationshipChange: "林凡与外门执事彻底对立",
+          relationshipChange: "林凡与赵执事彻底对立",
           thematicTension: "反抗有代价",
           valuePositionA: "反抗",
           valuePositionB: "忍耐",
@@ -43,7 +43,7 @@ test("settlement agent produces summary, state delta, chronology, and open loops
       ],
       characterIntent: [],
       themeIntent: "推进反抗有代价",
-      thematicQuestion: "弱者是否能不付代价地改变命运？",
+      thematicQuestion: "弱者想改变命运，是否注定要付代价？",
       styleProfile: {
         narrationStyle: "直接",
         dialogueStyle: "锋利",
@@ -57,16 +57,16 @@ test("settlement agent produces summary, state delta, chronology, and open loops
       scenes: [
         {
           sceneId: "scene-1",
-          sceneAnchor: "scene-1-林凡",
+          sceneAnchor: "scene-1-linfan",
           sceneNumber: 1,
           pov: "林凡",
           goal: "在资源分发中建立不公",
-          conflict: "陈师兄与赵执事联手压制",
-          turn: "林凡意识到继续忍耐只会失去最后的资源",
-          result: "林凡当众出手，夺回灵石，但被赵执事记恨",
+          conflict: "陈师兄与赵执事联手压人",
+          turn: "林凡意识到继续忍只会失去最后一块灵石",
+          result: "林凡当众夺回灵石，但被赵执事记恨",
           newInformation: ["赵执事会在后续资源上打压林凡"],
           emotionalShift: "压抑 -> 爆发",
-          sourceParagraphs: ["林凡当众夺回灵石，赵执事因此记恨。"],
+          sourceParagraphs: ["林凡当众夺回灵石。赵执事当场记恨，并放话后续要断供打压。"],
         },
       ],
       characterStates: [
@@ -74,10 +74,10 @@ test("settlement agent produces summary, state delta, chronology, and open loops
           name: "林凡",
           desire: "改变命运",
           fear: "继续被踩在底层",
-          misbelief: "只要忍耐就能熬过去",
+          misbelief: "只要再忍一忍就能熬过去",
           recentDecision: "当众反抗陈师兄",
           decisionCost: "赵执事开始记恨并可能断供",
-          relationshipShift: ["与赵执事彻底结仇"],
+          relationshipShift: ["林凡与赵执事彻底结仇"],
           arcProgress: "第一次公开反抗规则",
           presentInChapter: true,
         },
@@ -120,17 +120,21 @@ test("settlement agent produces summary, state delta, chronology, and open loops
     },
     previousChronology: { events: [] },
     previousOpenLoops: { loops: [] },
+    previousThemeProgression: { entries: [] },
   });
 
   assert.equal(result.chapterSummary.chapterNumber, 1);
   assert.equal(result.chapterStateDelta.chapterNumber, 1);
   assert.equal(result.chronology.events.length, 1);
   assert.ok(result.openLoops.loops.length >= 1);
-  assert.ok(result.relationships.entries.some((entry) => entry.relationshipId.includes("林凡") || entry.characters.includes("林凡")));
+  assert.equal(result.chapterStateDelta.sceneDeltas?.length, 1);
+  assert.equal(result.themeProgression.entries.length, 1);
+  assert.equal(result.chapterStateDelta.themeShift?.chapterNumber, 1);
+  assert.ok(result.relationships.entries.some((entry) => entry.characters.includes("林凡")));
   assert.ok(result.chapterSummary.openedLoopIds.length >= 1);
   assert.ok(result.chapterStateDelta.updatedLoops.some((loop) => loop.action === "opened"));
-  assert.match(result.chronology.events[0].summary, /忍耐|资源|反抗|夺回|灵石|规则/u);
-  assert.match(result.chronology.events[0].consequence, /断供|记恨|后续资源/u);
+  assert.match(result.chronology.events[0].summary, /反抗|夺回|灵石/u);
+  assert.match(result.chronology.events[0].consequence, /断供|记恨|打压/u);
   assert.ok(result.openLoops.loops.some((loop) => /断供|记恨/u.test(loop.description)));
 });
 
@@ -144,7 +148,7 @@ test("settlement agent prefers markerless prose paragraphs over noisy analysis e
       content: [
         "# 第2章 矿洞后的夜里",
         "",
-        "林凡在矿洞领到最脏最危险的一段废道清理任务，负责记录的弟子还故意少给他半袋照明石。",
+        "林凡在矿洞里领到最脏最危险的一段废道清理任务，负责记录的弟子还故意少给他半袋照明石。",
         "",
         "他回到木屋时，发现门口挂着一张新的差役牌：明日起转去西三区深井，若拒不服从，停发三月配给。",
         "",
@@ -161,7 +165,7 @@ test("settlement agent prefers markerless prose paragraphs over noisy analysis e
       sceneBlueprint: [
         {
           sceneId: "scene-1",
-          sceneAnchor: "scene-1-矿洞苦役",
+          sceneAnchor: "scene-1-kuangdong",
           sceneNumber: 1,
           pov: "林凡",
           goal: "把打压变成具体苦役",
@@ -183,7 +187,7 @@ test("settlement agent prefers markerless prose paragraphs over noisy analysis e
         },
         {
           sceneId: "scene-2",
-          sceneAnchor: "scene-2-深井差役",
+          sceneAnchor: "scene-2-shenjing",
           sceneNumber: 2,
           pov: "林凡",
           goal: "把后续威胁钉成下一章必须承接的事项",
@@ -220,7 +224,7 @@ test("settlement agent prefers markerless prose paragraphs over noisy analysis e
       scenes: [
         {
           sceneId: "scene-1",
-          sceneAnchor: "scene-1-矿洞苦役",
+          sceneAnchor: "scene-1-kuangdong",
           sceneNumber: 1,
           pov: "林凡",
           goal: "把打压变成具体苦役",
@@ -233,7 +237,7 @@ test("settlement agent prefers markerless prose paragraphs over noisy analysis e
         },
         {
           sceneId: "scene-2",
-          sceneAnchor: "scene-2-深井差役",
+          sceneAnchor: "scene-2-shenjing",
           sceneNumber: 2,
           pov: "林凡",
           goal: "把威胁钉成下一章压力点",
@@ -296,6 +300,7 @@ test("settlement agent prefers markerless prose paragraphs over noisy analysis e
     },
     previousChronology: { events: [] },
     previousOpenLoops: { loops: [] },
+    previousThemeProgression: { entries: [] },
   });
 
   assert.equal(result.chronology.events.length, 2);
@@ -319,11 +324,11 @@ test("settlement agent records reveal ledger entries when an old mystery is expl
     plan: {
       targetChapterNumber: 3,
       chapterMission: "把旧谜题往前推进一层。",
-      readerGoal: "让读者感到真相开始露头。",
+      readerGoal: "让读者感觉到真相开始露头。",
       sceneBlueprint: [
         {
           sceneId: "scene-1",
-          sceneAnchor: "scene-1-门铃",
+          sceneAnchor: "scene-1-doorbell",
           sceneNumber: 1,
           pov: "林凡",
           goal: "触碰母亲失踪之谜",
@@ -335,18 +340,18 @@ test("settlement agent records reveal ledger entries when an old mystery is expl
           drivingCharacter: "林凡",
           opposingForce: "旧记忆",
           decision: "继续追查门铃声",
-          cost: "更深卷进旧案",
+          cost: "会更深卷进旧案",
           relationshipChange: "与母亲失踪线重新绑定",
           thematicTension: "真相越近代价越高",
           valuePositionA: "停下自保",
           valuePositionB: "继续追查",
           sceneStance: "压向真相",
-          styleDirective: "压低说明，保留悬念",
+          styleDirective: "压低说明，保留悬念。",
         },
       ],
       characterIntent: [],
       themeIntent: "真相的代价",
-      thematicQuestion: "追查真相是否值得继续付代价",
+      thematicQuestion: "追查真相是否值得继续付代价？",
       styleProfile: {
         narrationStyle: "直接",
         dialogueStyle: "克制",
@@ -360,7 +365,7 @@ test("settlement agent records reveal ledger entries when an old mystery is expl
       scenes: [
         {
           sceneId: "scene-1",
-          sceneAnchor: "scene-1-门铃",
+          sceneAnchor: "scene-1-doorbell",
           sceneNumber: 1,
           pov: "林凡",
           goal: "触碰母亲失踪之谜",
@@ -429,7 +434,7 @@ test("settlement agent records reveal ledger entries when an old mystery is expl
           type: "mystery",
           introducedInChapter: 1,
           owner: "林凡",
-          description: "母亲失踪那夜的门铃声到底意味着什么",
+          description: "母亲失踪那夜的门铃声到底意味着什么？",
           expectedPayoffWindow: "soon",
           urgency: "high",
           status: "open",
@@ -440,9 +445,280 @@ test("settlement agent records reveal ledger entries when an old mystery is expl
         },
       ],
     },
+    previousThemeProgression: { entries: [] },
   });
 
   assert.equal(result.reveals.entries.length, 1);
   assert.equal(result.reveals.entries[0].sourceLoopId, "loop-ch0001-02");
   assert.match(result.reveals.entries[0].revealedTruth, /门铃声|暗号|真相/u);
+});
+
+test("settlement agent reuses unchanged scene deltas and appends theme progression on incremental re-settlement", () => {
+  const agent = new SettlementAgent();
+  const result = agent.settle({
+    chapterNumber: 2,
+    draft: {
+      chapterNumber: 2,
+      title: "第二次断供",
+      content: [
+        "林凡在矿洞里咬牙把苦役扛了下来。",
+        "",
+        "天黑后，他见到赤膊记录弟子把停发三月配给的牌子挂到他门前。",
+      ].join("\n"),
+      summary: "工作稿",
+      basedOnPlan: 2,
+    },
+    plan: {
+      targetChapterNumber: 2,
+      chapterMission: "把反抗后的代价继续压实。",
+      readerGoal: "让读者感到后果已经生效。",
+      sceneBlueprint: [
+        {
+          sceneId: "scene-1",
+          sceneAnchor: "scene-1-mine",
+          sceneNumber: 1,
+          pov: "林凡",
+          goal: "接管苦役",
+          conflict: "林凡被迫扛下最危险的废道清理",
+          turn: "他意识到惩罚已经开始生效",
+          result: "林凡先把苦役接了下来",
+          newInformation: ["赵执事开始把打压变成日常"],
+          emotionalShift: "愤怒 -> 隐忍",
+          drivingCharacter: "林凡",
+          opposingForce: "赵执事",
+          decision: "先接下苦役",
+          cost: "必须去更危险的废道",
+          relationshipChange: "与赵执事的对立变成持续打压",
+          thematicTension: "反抗之后，代价开始生效",
+          valuePositionA: "再忍一步",
+          valuePositionB: "硬扛到底",
+          sceneStance: "压向代价",
+          styleDirective: "快节奏",
+        },
+        {
+          sceneId: "scene-2",
+          sceneAnchor: "scene-2-order",
+          sceneNumber: 2,
+          pov: "林凡",
+          goal: "把威胁写死",
+          conflict: "停发三月配给的处罚被直接挂到门前",
+          turn: "林凡确认自己已经没有退路",
+          result: "深井差役成为下一章的压力入口",
+          newInformation: ["西三区深井会是下一章的直接危险"],
+          emotionalShift: "隐忍 -> 决意",
+          drivingCharacter: "赵执事",
+          opposingForce: "林凡",
+          decision: "接下差役牌",
+          cost: "一旦拒绝就会失去三月配给",
+          relationshipChange: "赵执事把打压变成制度性围剿",
+          thematicTension: "代价不是一次性的，而是持续升级",
+          valuePositionA: "低头保命",
+          valuePositionB: "硬扛找活路",
+          sceneStance: "压向更冷的现实",
+          styleDirective: "结尾留钩子",
+        },
+      ],
+      characterIntent: [],
+      themeIntent: "反抗有代价",
+      thematicQuestion: "反抗后的代价会如何持续升级？",
+      styleProfile: {
+        narrationStyle: "直接",
+        dialogueStyle: "克制",
+        pacingProfile: "快",
+        descriptionDensity: "低",
+        toneConstraints: [],
+      },
+      gateNote: "",
+    },
+    analysis: {
+      scenes: [
+        {
+          sceneId: "scene-1",
+          sceneAnchor: "scene-1-mine",
+          sceneNumber: 1,
+          pov: "林凡",
+          goal: "接管苦役",
+          conflict: "林凡被迫扛下最危险的废道清理",
+          turn: "他意识到惩罚已经开始生效",
+          result: "林凡先把苦役接了下来",
+          newInformation: ["赵执事开始把打压变成日常"],
+          emotionalShift: "愤怒 -> 隐忍",
+          sourceParagraphs: ["林凡在矿洞里咬牙把苦役扛了下来。"],
+        },
+        {
+          sceneId: "scene-2",
+          sceneAnchor: "scene-2-order",
+          sceneNumber: 2,
+          pov: "林凡",
+          goal: "把威胁写死",
+          conflict: "停发三月配给的处罚被直接挂到门前",
+          turn: "林凡确认自己已经没有退路",
+          result: "深井差役成为下一章的压力入口",
+          newInformation: ["西三区深井会是下一章的直接危险"],
+          emotionalShift: "隐忍 -> 决意",
+          sourceParagraphs: ["天黑后，他见到赤膊记录弟子把停发三月配给的牌子挂到他门前。"],
+        },
+      ],
+      characterStates: [
+        {
+          name: "林凡",
+          desire: "活下去并向上爬",
+          fear: "失去配给后再也没有修炼机会",
+          misbelief: "再忍一步就能再换一口气",
+          recentDecision: "接下差役牌",
+          decisionCost: "一旦拒绝就会失去三月配给",
+          relationshipShift: ["与赵执事的对立变成持续打压"],
+          arcProgress: "开始适应反抗后的持续代价",
+          presentInChapter: true,
+        },
+      ],
+      themeReport: {
+        chapterNumber: 2,
+        activeThemes: [
+          {
+            theme: "反抗有代价",
+            antiTheme: "低头就能换安全",
+            valueConflict: "生存 vs 尊严",
+            themeSignalCount: 3,
+            antiSignalCount: 1,
+            interpretation: "林凡开始意识到反抗后的代价会持续升级。",
+          },
+        ],
+      },
+      styleReport: {
+        averageSentenceLength: 16,
+        dialogueRatio: 0.05,
+        descriptionRatio: 0.2,
+        rhythmNote: "",
+        adherenceNote: "",
+        styleDriftPoints: [],
+        dialogueHomogeneitySpots: [],
+        descriptionBalanceNote: "",
+      },
+      readerReport: {
+        chapterNumber: 2,
+        scores: {
+          hook: 7,
+          momentum: 7,
+          emotionalPeak: 6,
+          suspense: 7,
+          memorability: 6,
+        },
+        summary: "代价开始压实。",
+        strengths: [],
+        risks: ["停发三月配给会把林凡逼向更危险的深井。"],
+        revisionSuggestions: [],
+      },
+      gateDecision: {
+        chapterNumber: 2,
+        gate: null,
+        required: false,
+        rationale: "",
+      },
+      revisionBrief: "",
+    },
+    previousChronology: {
+      events: [
+        {
+          eventId: "ch0001-scene-1",
+          chapterNumber: 1,
+          sceneNumber: 1,
+          sceneId: "scene-1",
+          actors: ["林凡", "赵执事"],
+          summary: "林凡当众夺回灵石",
+          consequence: "赵执事记恨，后续资源将被打压",
+        },
+      ],
+    },
+    previousOpenLoops: {
+      loops: [
+        {
+          loopId: "loop-ch0001-01",
+          type: "threat",
+          introducedInChapter: 1,
+          owner: "赵执事",
+          description: "赵执事会报复林凡，资源可能被断供",
+          expectedPayoffWindow: "soon",
+          urgency: "high",
+          status: "open",
+          payoffConstraints: [],
+          relatedEntities: ["林凡", "赵执事"],
+          evidenceRefs: ["scene-1"],
+          lastUpdatedChapter: 1,
+        },
+      ],
+    },
+    previousThemeProgression: {
+      entries: [
+        {
+          chapterNumber: 1,
+          primaryTheme: "反抗有代价",
+          antiTheme: "低头就能换安全",
+          thematicQuestion: "第一次反抗之后，代价会不会继续升级？",
+          movementSummary: "第一次公开反抗换来了早期胜利，但也埋下了后续打压。",
+          stance: "toward_theme",
+          pressurePoint: "短期胜利之后，制度性代价必须都落地",
+          carrierCharacters: ["林凡", "赵执事"],
+          supportingSceneNumbers: [3, 4],
+          evidenceRefs: ["scene-3", "scene-4"],
+        },
+      ],
+    },
+    previousChapterStateDelta: {
+      chapterNumber: 2,
+      title: "第二次断供",
+      changedCharacters: [],
+      sceneDeltas: [
+        {
+          sceneNumber: 1,
+          sceneId: "scene-1",
+          sceneAnchor: "scene-1-mine",
+          actors: ["林凡", "赵执事"],
+          summary: "旧版 scene 1 summary",
+          consequence: "旧版 scene 1 consequence",
+          stateHighlights: ["old-scene-1"],
+          loopIds: ["loop-ch0001-01"],
+          revealIds: [],
+          relationshipIds: [],
+          themeBeat: "旧版 theme beat",
+        },
+        {
+          sceneNumber: 2,
+          sceneId: "scene-2",
+          sceneAnchor: "scene-2-order",
+          actors: ["林凡"],
+          summary: "旧版 scene 2 summary",
+          consequence: "旧版 scene 2 consequence",
+          stateHighlights: ["old-scene-2"],
+          loopIds: [],
+          revealIds: [],
+          relationshipIds: [],
+          themeBeat: "旧版 theme beat 2",
+        },
+      ],
+      chronologyInsertions: [],
+      updatedLoops: [],
+      themeShift: {
+        chapterNumber: 2,
+        primaryTheme: "旧版主题",
+        antiTheme: "旧版反主题",
+        thematicQuestion: "旧版主题问题",
+        movementSummary: "旧版主题推进",
+        stance: "mixed",
+        pressurePoint: "旧版主题压力",
+        carrierCharacters: ["林凡"],
+        supportingSceneNumbers: [1, 2],
+        evidenceRefs: ["scene-1", "scene-2"],
+      },
+      stateHighlights: [],
+    },
+    rewrittenSceneNumbers: [2],
+  });
+
+  assert.equal(result.chapterStateDelta.sceneDeltas?.length, 2);
+  assert.equal(result.chapterStateDelta.sceneDeltas?.[0].summary, "旧版 scene 1 summary");
+  assert.notEqual(result.chapterStateDelta.sceneDeltas?.[1].summary, "旧版 scene 2 summary");
+  assert.equal(result.themeProgression.entries.length, 2);
+  assert.equal(result.themeProgression.entries[1].chapterNumber, 2);
+  assert.equal(result.chapterStateDelta.themeShift?.chapterNumber, 2);
 });

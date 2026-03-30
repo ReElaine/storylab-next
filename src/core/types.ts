@@ -264,6 +264,37 @@ export interface RelationshipLedger {
   readonly entries: ReadonlyArray<RelationshipLedgerEntry>;
 }
 
+export interface ThemeProgressionEntry {
+  readonly chapterNumber: number;
+  readonly primaryTheme: string;
+  readonly antiTheme: string;
+  readonly thematicQuestion: string;
+  readonly movementSummary: string;
+  readonly stance: "toward_theme" | "toward_anti_theme" | "mixed";
+  readonly pressurePoint: string;
+  readonly carrierCharacters: ReadonlyArray<string>;
+  readonly supportingSceneNumbers: ReadonlyArray<number>;
+  readonly evidenceRefs: ReadonlyArray<string>;
+}
+
+export interface ThemeProgressionLedger {
+  readonly entries: ReadonlyArray<ThemeProgressionEntry>;
+}
+
+export interface SceneStateDelta {
+  readonly sceneNumber: number;
+  readonly sceneId?: string;
+  readonly sceneAnchor?: string;
+  readonly actors: ReadonlyArray<string>;
+  readonly summary: string;
+  readonly consequence: string;
+  readonly stateHighlights: ReadonlyArray<string>;
+  readonly loopIds: ReadonlyArray<string>;
+  readonly revealIds: ReadonlyArray<string>;
+  readonly relationshipIds: ReadonlyArray<string>;
+  readonly themeBeat: string;
+}
+
 export interface ChapterStateDelta {
   readonly chapterNumber: number;
   readonly title: string;
@@ -274,6 +305,7 @@ export interface ChapterStateDelta {
     readonly arcProgress: string;
     readonly summary: string;
   }>;
+  readonly sceneDeltas?: ReadonlyArray<SceneStateDelta>;
   readonly chronologyInsertions: ReadonlyArray<ChronologyEvent>;
   readonly updatedLoops: ReadonlyArray<{
     readonly loopId: string;
@@ -281,6 +313,7 @@ export interface ChapterStateDelta {
     readonly description: string;
     readonly evidence: string;
   }>;
+  readonly themeShift?: ThemeProgressionEntry;
   readonly stateHighlights: ReadonlyArray<string>;
 }
 
@@ -291,6 +324,7 @@ export interface SettlementBundle {
   readonly openLoops: OpenLoopsLedger;
   readonly reveals: RevealsLedger;
   readonly relationships: RelationshipLedger;
+  readonly themeProgression: ThemeProgressionLedger;
 }
 
 export interface SettlementOutputPaths {
@@ -300,6 +334,7 @@ export interface SettlementOutputPaths {
   readonly openLoopsPath: string;
   readonly revealsPath: string;
   readonly relationshipsPath: string;
+  readonly themeProgressionPath: string;
 }
 
 export interface ContinuityIssue {
@@ -391,6 +426,7 @@ export interface ContextPack {
   readonly activeOpenLoops: ReadonlyArray<OpenLoopEntry>;
   readonly recentReveals: ReadonlyArray<RevealEntry>;
   readonly recentRelationshipChanges: ReadonlyArray<RelationshipLedgerEntry>;
+  readonly recentThemeProgression: ReadonlyArray<ThemeProgressionEntry>;
   readonly chronologySlice: ReadonlyArray<ChronologyEvent>;
   readonly relevantCharacterStates: ReadonlyArray<{
     readonly name: string;

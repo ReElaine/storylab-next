@@ -12,37 +12,8 @@ import type {
   StyleGuide,
   StyleProfile,
   ThemeHistory,
+  ThemeProgressionLedger,
 } from "../types.js";
-
-function buildMission(
-  memory: StoryMemory,
-  chapterSummaries: ReadonlyArray<ChapterSummaryRecord>,
-  openLoops: OpenLoopsLedger,
-  reveals: RevealsLedger,
-  relationships: RelationshipLedger,
-): string {
-  const latestReveal = reveals.entries.at(-1);
-  if (latestReveal) {
-    return `承接“${latestReveal.subject}”已经被揭示为“${latestReveal.revealedTruth}”，把它转成新的行动、后果或更大的压力。`;
-  }
-  const urgentLoop = openLoops.loops.find((loop) => loop.status !== "closed" && loop.urgency === "high")
-    ?? openLoops.loops.find((loop) => loop.status !== "closed");
-  if (urgentLoop) {
-    return `承接未兑现事项“${urgentLoop.description}”，并把它推进成更明确的章节行动。`;
-  }
-  const latestRelationship = relationships.entries.at(-1);
-  if (latestRelationship) {
-    return `承接“${latestRelationship.characters.join(" / ")}”关系变化“${latestRelationship.lastChange}”，让关系压力转成新的冲突行动。`;
-  }
-  if (memory.activeHooks.length > 0) {
-    return `推进 ${memory.activeHooks[0]}，同时把上一章遗留的不安转化为更明确的行动。`;
-  }
-  const latestSummary = chapterSummaries.at(-1);
-  if (latestSummary) {
-    return `承接上一章“${latestSummary.summary}”留下的局面，推动角色进入下一轮冲突。`;
-  }
-  return "让角色从当前状态进入下一轮更具体的冲突。";
-}
 
 function buildStyleProfile(guide: StyleGuide): StyleProfile {
   return {
@@ -61,6 +32,47 @@ function buildSceneIdentity(sceneNumber: number, pov: string): Pick<SceneBluepri
   };
 }
 
+function buildMission(
+  memory: StoryMemory,
+  chapterSummaries: ReadonlyArray<ChapterSummaryRecord>,
+  openLoops: OpenLoopsLedger,
+  reveals: RevealsLedger,
+  relationships: RelationshipLedger,
+  themeProgression: ThemeProgressionLedger,
+): string {
+  const latestReveal = reveals.entries.at(-1);
+  if (latestReveal) {
+    return `承接“${latestReveal.subject}”已被揭示为“${latestReveal.revealedTruth}”，把真相转成新的行动压力与后果。`;
+  }
+
+  const urgentLoop = openLoops.loops.find((loop) => loop.status !== "closed" && loop.urgency === "high")
+    ?? openLoops.loops.find((loop) => loop.status !== "closed");
+  if (urgentLoop) {
+    return `承接未兑现事项“${urgentLoop.description}”，把它推进成更具体的章节行动。`;
+  }
+
+  const latestRelationship = relationships.entries.at(-1);
+  if (latestRelationship) {
+    return `承接“${latestRelationship.characters.join(" / ")}”关系变化“${latestRelationship.lastChange}”，让关系压力转成新冲突。`;
+  }
+
+  const latestThemeProgression = themeProgression.entries.at(-1);
+  if (latestThemeProgression) {
+    return `承接主题推进“${latestThemeProgression.primaryTheme}”，继续把“${latestThemeProgression.movementSummary}”压成新的选择与代价。`;
+  }
+
+  if (memory.activeHooks.length > 0) {
+    return `推进 ${memory.activeHooks[0]}，同时把上一章遗留的不安转化为更明确的行动。`;
+  }
+
+  const latestSummary = chapterSummaries.at(-1);
+  if (latestSummary) {
+    return `承接上一章“${latestSummary.summary}”留下的局面，推动角色进入下一轮冲突。`;
+  }
+
+  return "让角色从当前状态进入下一轮更具体的冲突。";
+}
+
 function buildSceneBlueprint(
   characterHistory: ReadonlyArray<CharacterHistory>,
   themeHistory: ThemeHistory,
@@ -70,10 +82,12 @@ function buildSceneBlueprint(
   openLoops: OpenLoopsLedger,
   reveals: RevealsLedger,
   relationships: RelationshipLedger,
+  themeProgression: ThemeProgressionLedger,
 ): ReadonlyArray<SceneBlueprintItem> {
   const lead = characterHistory[0]?.latestState;
   const obstacle = characterHistory[1]?.latestState;
-  const latestTheme = themeHistory.timeline[themeHistory.timeline.length - 1];
+  const latestTheme = themeHistory.timeline.at(-1);
+  const latestThemeProgression = themeProgression.entries.at(-1);
   const latestSummary = chapterSummaries.at(-1);
   const urgentLoop = openLoops.loops.find((loop) => loop.status !== "closed" && loop.urgency === "high")
     ?? openLoops.loops.find((loop) => loop.status !== "closed");
@@ -83,23 +97,23 @@ function buildSceneBlueprint(
   const leadName = lead?.name ?? "主角";
   const relationshipOpponent = latestRelationship?.characters.find((name) => name !== leadName);
   const opposingName = relationshipOpponent ?? obstacle?.name ?? "阻碍者";
-  const theme = latestTheme?.theme ?? "代价与亲密";
-  const antiTheme = latestTheme?.antiTheme ?? "力量可以无损获得";
-  const valueConflict = latestTheme?.interpretation ?? "控制自己 vs 接受他人介入";
+  const theme = latestThemeProgression?.primaryTheme ?? latestTheme?.theme ?? "反抗有代价";
+  const antiTheme = latestThemeProgression?.antiTheme ?? latestTheme?.antiTheme ?? "力量可以无损获得";
+  const valueConflict = latestThemeProgression?.movementSummary ?? latestTheme?.interpretation ?? "控制自己 vs 接受他人介入";
   const carryForward = latestReveal
     ? `${latestReveal.subject}的真相已明确：${latestReveal.revealedTruth}`
     : urgentLoop?.description
-    ?? latestRelationship?.lastChange
-    ?? latestSummary?.summary
-    ?? recentEvent?.summary
-    ?? "上一章遗留的问题";
+      ?? latestRelationship?.lastChange
+      ?? latestSummary?.summary
+      ?? recentEvent?.summary
+      ?? "上一章遗留的问题";
 
   return [
     {
       ...buildSceneIdentity(1, leadName),
       sceneNumber: 1,
       pov: leadName,
-      goal: `${leadName}试图主动推进“${carryForward}”`,
+      goal: `${leadName}尝试主动推进“${carryForward}”`,
       conflict: `${opposingName}让目标必须伴随代价`,
       turn: `${leadName}意识到当前误判正在放大风险`,
       result: `${leadName}被迫继续推进，而不是原地观望`,
@@ -108,9 +122,9 @@ function buildSceneBlueprint(
       drivingCharacter: leadName,
       opposingForce: opposingName,
       decision: `${leadName}必须决定是继续推进，还是暂时后撤`,
-      cost: `${leadName}一旦继续推进，就要先付出 ${lead?.decisionCost ?? "明确代价"}`,
-      relationshipChange: latestRelationship?.lastChange ?? `${leadName}与${opposingName}从试探进入高压协作`,
-      thematicTension: `${theme} vs ${antiTheme}`,
+      cost: `${leadName}一旦继续推进，就要先付出${lead?.decisionCost ?? "明确代价"}`,
+      relationshipChange: latestRelationship?.lastChange ?? `${leadName}与${opposingName}从试探进入高压对抗`,
+      thematicTension: latestThemeProgression?.pressurePoint ?? `${theme} vs ${antiTheme}`,
       valuePositionA: theme,
       valuePositionB: antiTheme,
       sceneStance: `先压向 ${theme}`,
@@ -128,7 +142,7 @@ function buildSceneBlueprint(
       emotionalShift: "紧张 -> 压迫",
       drivingCharacter: leadName,
       opposingForce: opposingName,
-      decision: `${leadName}必须在隐瞒、求助或抢先行动之间做决定`,
+      decision: `${leadName}必须在隐忍、求助或抢先行动之间做决定`,
       cost: `该决定会立刻带来 ${lead?.decisionCost ?? "关系与身体上的代价"}`,
       relationshipChange: latestRelationship?.lastChange ?? `${leadName}与${opposingName}的关系被迫重新划线`,
       thematicTension: `价值冲突通过选择体现：${valueConflict}`,
@@ -172,21 +186,24 @@ export class ChapterPlanner {
     openLoops: OpenLoopsLedger,
     reveals: RevealsLedger,
     relationships: RelationshipLedger,
+    themeProgression: ThemeProgressionLedger,
     gates: ReadonlyArray<HumanGate>,
     styleGuide: StyleGuide,
   ): ChapterPlan {
     const presentCharacters = characterHistory.filter((entry) => entry.latestState.presentInChapter).slice(0, 3);
-    const latestTheme = themeHistory.timeline[themeHistory.timeline.length - 1];
+    const latestTheme = themeHistory.timeline.at(-1);
+    const latestThemeProgression = themeProgression.entries.at(-1);
     const nextGate = gates.find((gate) => gate.triggerChapter === targetChapterNumber);
     const styleProfile = buildStyleProfile(styleGuide);
-    const thematicQuestion = latestTheme
-      ? `本章是否要让“${latestTheme.theme}”击败“${latestTheme.antiTheme}”？`
-      : "本章的事件是否真正承担了主题表达？";
+    const thematicQuestion = latestThemeProgression?.thematicQuestion
+      ?? (latestTheme
+        ? `本章是否要让“${latestTheme.theme}”击退“${latestTheme.antiTheme}”？`
+        : "本章的事件是否真正承担了主题表达？");
     const activeLoop = openLoops.loops.find((loop) => loop.status !== "closed");
 
     return {
       targetChapterNumber,
-      chapterMission: buildMission(memory, chapterSummaries, openLoops, reveals, relationships),
+      chapterMission: buildMission(memory, chapterSummaries, openLoops, reveals, relationships, themeProgression),
       readerGoal: "让读者同时获得推进感、代价感和明确的追读钩子。",
       sceneBlueprint: buildSceneBlueprint(
         presentCharacters,
@@ -197,18 +214,21 @@ export class ChapterPlanner {
         openLoops,
         reveals,
         relationships,
+        themeProgression,
       ),
       characterIntent: presentCharacters.map((entry, index) => ({
         name: entry.name,
         desiredMovement:
           index === 0
             ? `${entry.name}要在本章做出关键选择，并被其误判拖向更危险的结果`
-            : `${entry.name}要成为压力源，逼使主角面对真实代价`,
+            : `${entry.name}要成为压力源，迫使主角面对真实代价`,
         costPressure: entry.latestState.decisionCost,
       })),
-      themeIntent: latestTheme
-        ? `本章要推进“${latestTheme.theme}”对“${latestTheme.antiTheme}”的压制，并通过角色选择承载价值冲突。`
-        : "本章必须让事件服务于主题表达，而不只是推进情节。",
+      themeIntent: latestThemeProgression
+        ? `本章要延续“${latestThemeProgression.primaryTheme}”的推进，并把“${latestThemeProgression.movementSummary}”压成新的行动代价。`
+        : latestTheme
+          ? `本章要推进“${latestTheme.theme}”对“${latestTheme.antiTheme}”的压制，并通过角色选择承载价值冲突。`
+          : "本章必须让事件服务于主题表达，而不只是推进情节。",
       thematicQuestion,
       styleProfile,
       gateNote: nextGate
@@ -216,10 +236,10 @@ export class ChapterPlanner {
         : reveals.entries.at(-1)
           ? `本章必须承接最近揭示：“${reveals.entries.at(-1)?.subject} -> ${reveals.entries.at(-1)?.revealedTruth}”。`
           : activeLoop
-          ? `本章必须继续承接 open loop：“${activeLoop.description}”。`
-          : relationships.entries.at(-1)
-            ? `本章必须继续承接关系变化：“${relationships.entries.at(-1)?.characters.join(" / ")} -> ${relationships.entries.at(-1)?.lastChange}”。`
-          : "本章没有命中阻断式 gate，但仍需按 revision brief 自查。",
+            ? `本章必须继续承接 open loop：“${activeLoop.description}”。`
+            : relationships.entries.at(-1)
+              ? `本章必须继续承接关系变化：“${relationships.entries.at(-1)?.characters.join(" / ")} -> ${relationships.entries.at(-1)?.lastChange}”。`
+              : "本章没有命中阻断式 gate，但仍需按 revision brief 自查。",
     };
   }
 }
