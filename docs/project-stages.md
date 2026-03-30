@@ -312,7 +312,8 @@
 但当前仍待继续做强：
 
 - theme progression 目前是初版账本，已进入 `settlement -> context-pack -> plan-next`
-- scene 级增量重结算已接入，但仍是“按 scene delta 复用/重算”的第一版
+- scene 级增量重结算已接入，并且已经进入初版 scene output-state fold
+- chapter 级 chronology / open loops / reveals / relationships / theme progression 会优先 fold scene output-state
 - 更细的 canonical delta merge 已接入初版，后续仍可继续细化合并策略
 
 这条路线当前已经不只是“立项记录”，而是：

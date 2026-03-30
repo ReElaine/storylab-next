@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ChapterAnalysisBundle,
   ChapterDraft,
   ChapterPlan,
@@ -12,6 +12,7 @@ import type {
   RelationshipLedgerEntry,
   RevealEntry,
   RevealsLedger,
+  SceneOutputState,
   SceneStateDelta,
   SceneBlueprintItem,
   SettlementBundle,
@@ -483,211 +484,6 @@ function buildChapterSignals(input: SettlementInput, chronologyInsertions: Reado
     .trim();
 }
 
-function collectLoopSources(
-  input: SettlementInput,
-  chronologyInsertions: ReadonlyArray<ChronologyEvent>,
-): ReadonlyArray<string> {
-  const draftSentences = splitIntoSentences(input.draft.content).filter((sentence) => !/“|”|「|」/u.test(sentence));
-  const chronologyConsequences = chronologyInsertions.map((event) => event.consequence);
-  const characterCosts = input.analysis.characterStates
-    .filter((state) => state.presentInChapter)
-    .map((state) => state.decisionCost);
-  const planCosts = input.plan.sceneBlueprint.flatMap((scene) => [
-    scene.cost,
-    ...scene.newInformation,
-    OPEN_LOOP_SIGNAL.test(scene.result) ? scene.result : "",
-  ]);
-
-  const characterNames = input.analysis.characterStates.map((state) => state.name);
-
-  const ranked = uniqueStrings([
-    ...input.analysis.readerReport.risks,
-    ...characterCosts,
-    ...planCosts,
-    ...chronologyConsequences,
-    ...draftSentences.filter((sentence) => OPEN_LOOP_SIGNAL.test(sentence)),
-  ])
-    .filter((text) => OPEN_LOOP_SIGNAL.test(text))
-    .filter((text) => !/推进当前悬念|场景结束时获得有限推进|场景以内压推进|场景中段出现逆转/u.test(text))
-    .filter((text) => !/一旦决定落地/u.test(text))
-    .filter((text) => !META_NARRATIVE_SIGNAL.test(text))
-      .map((text) => {
-        let score = 0;
-        if (/记恨|断供|报复|危险|安排|真相|秘密/u.test(text)) score += 4;
-        if (/后续|以后|下月|下一章|会|将/u.test(text)) score += 3;
-        if (characterNames.some((name) => text.includes(name))) score += 2;
-        if (/偏帮有背景的弟子/u.test(text)) score -= 5;
-        if (/只要反抗/u.test(text)) score -= 2;
-        if (text.length >= 12 && text.length <= 72) score += 2;
-        return { text, score };
-      })
-      .sort((left, right) => right.score - left.score)
-      .reduce<Array<{ text: string; keywords: ReadonlyArray<string> }>>((selected, item) => {
-        if (selected.length >= 2) {
-          return selected;
-        }
-
-        const keywords = extractKeywords(item.text);
-        if (/偏帮有背景的弟子/u.test(item.text) && selected.length >= 1) {
-          return selected;
-        }
-        const overlapsExisting = selected.some((existing) => {
-          const overlap = keywords.filter((keyword) => existing.keywords.includes(keyword)).length;
-          return overlap >= Math.min(2, keywords.length) && overlap > 0;
-      });
-      if (overlapsExisting) {
-        return selected;
-      }
-
-      selected.push({ text: item.text, keywords });
-      return selected;
-    }, [])
-    .map((item) => item.text);
-
-  return ranked;
-}
-
-function createNewLoopCandidates(
-  input: SettlementInput,
-  existingLoops: ReadonlyArray<OpenLoopEntry>,
-  chronologyInsertions: ReadonlyArray<ChronologyEvent>,
-): ReadonlyArray<OpenLoopEntry> {
-  const sources = collectLoopSources(input, chronologyInsertions).filter((source, index, all) => (
-    !all.some((other, otherIndex) => otherIndex !== index && other.includes(source))
-  ));
-  const existingDescriptions = existingLoops.map((loop) => loop.description);
-  const nextIndexBase = existingLoops.filter((loop) => loop.introducedInChapter === input.chapterNumber).length;
-
-  return sources
-    .filter((source) => !existingDescriptions.some((description) => description.includes(source) || source.includes(description)))
-    .map((source, index) => {
-      const relatedEntities = uniqueStrings(
-        input.analysis.characterStates
-          .filter((character) => source.includes(character.name))
-          .map((character) => character.name),
-      );
-      const sourceKeywords = extractKeywords(source);
-      const matchingEvent = chronologyInsertions
-        .map((event) => {
-          let score = 0;
-          if (event.summary.includes(source) || source.includes(event.summary)) score += 5;
-          if (event.consequence.includes(source) || source.includes(event.consequence)) score += 5;
-          score += relatedEntities.filter((entity) => event.actors.includes(entity)).length;
-          score += sourceKeywords.filter((keyword) => (
-            event.summary.includes(keyword) || event.consequence.includes(keyword)
-          )).length;
-          return { event, score };
-        })
-        .sort((left, right) => right.score - left.score)[0]?.event;
-      const owner = relatedEntities[0] ?? matchingEvent?.actors[0] ?? input.analysis.scenes[0]?.pov ?? "章节系统";
-
-      return {
-        loopId: `loop-ch${String(input.chapterNumber).padStart(4, "0")}-${String(nextIndexBase + index + 1).padStart(2, "0")}`,
-        type: pickLoopType(source),
-        introducedInChapter: input.chapterNumber,
-        owner,
-        description: compactLedgerSentence(source, sourceKeywords, relatedEntities, "consequence"),
-        expectedPayoffWindow: pickUrgency(source) === "high" ? "soon" : "mid",
-        urgency: pickUrgency(source),
-        status: "open",
-        payoffConstraints: [
-          "后续章节必须继续承接这条未兑现事项",
-        ],
-        relatedEntities,
-        evidenceRefs: matchingEvent ? [`scene-${matchingEvent.sceneNumber}`] : input.analysis.scenes.map((scene) => `scene-${scene.sceneNumber}`),
-        lastUpdatedChapter: input.chapterNumber,
-      } satisfies OpenLoopEntry;
-    });
-}
-
-function inferRevealStrength(text: string, shouldClose: boolean): RevealEntry["revealStrength"] {
-  if (shouldClose || /原来|其实|终于知道|终于明白|说破|揭开/u.test(text)) {
-    return "explicit";
-  }
-  if (/真相|秘密|暴露|看穿/u.test(text)) {
-    return "partial";
-  }
-  return "hinted";
-}
-
-function buildRevealSentence(
-  evidence: string,
-  keywords: ReadonlyArray<string>,
-  entities: ReadonlyArray<string>,
-  fallback: string,
-): string {
-  const candidate = pickBestSentence(evidence, keywords, entities, "consequence");
-  if (candidate && REVEAL_SIGNAL.test(candidate)) {
-    return trimSentence(normalizeLedgerPhrase(candidate), 72);
-  }
-  return trimSentence(normalizeLedgerPhrase(fallback), 72);
-}
-
-function buildReveals(
-  input: SettlementInput,
-  chronologyInsertions: ReadonlyArray<ChronologyEvent>,
-  chapterSignals: string,
-  sceneEvidenceMap: ReadonlyMap<number, string>,
-  loopStatusMap: ReadonlyMap<string, "open" | "advanced" | "closed">,
-): RevealsLedger {
-  const entries: RevealEntry[] = [];
-
-  for (const loop of input.previousOpenLoops.loops) {
-    if (loop.status === "closed") {
-      continue;
-    }
-    if (!["mystery", "question", "promise"].includes(loop.type)) {
-      continue;
-    }
-
-    const loopKeywords = extractKeywords(loop.description);
-    const hasLoopSignal = loopKeywords.some((keyword) => chapterSignals.includes(keyword))
-      || loop.relatedEntities.some((entity) => entity.length > 0 && chapterSignals.includes(entity));
-    if (!hasLoopSignal || !REVEAL_SIGNAL.test(chapterSignals)) {
-      continue;
-    }
-
-    const matchingEvent = chronologyInsertions
-      .map((event) => {
-        let score = 0;
-        score += loopKeywords.filter((keyword) => event.summary.includes(keyword) || event.consequence.includes(keyword)).length * 2;
-        score += loop.relatedEntities.filter((entity) => event.actors.includes(entity)).length * 2;
-        if (REVEAL_SIGNAL.test(event.summary)) score += 3;
-        if (REVEAL_SIGNAL.test(event.consequence)) score += 4;
-        return { event, score };
-      })
-      .sort((left, right) => right.score - left.score)[0]?.event;
-
-    const sceneNumber = matchingEvent?.sceneNumber ?? null;
-    const evidence = sceneNumber !== null ? (sceneEvidenceMap.get(sceneNumber) ?? chapterSignals) : chapterSignals;
-    const action = loopStatusMap.get(loop.loopId) ?? loop.status;
-    const revealStrength = inferRevealStrength(evidence, action === "closed");
-    const revealedTruth = buildRevealSentence(
-      evidence,
-      loopKeywords,
-      loop.relatedEntities,
-      matchingEvent?.consequence ?? matchingEvent?.summary ?? loop.description,
-    );
-
-    entries.push({
-      revealId: `reveal-ch${String(input.chapterNumber).padStart(4, "0")}-${String(entries.length + 1).padStart(2, "0")}`,
-      chapterNumber: input.chapterNumber,
-      sceneNumber,
-      sceneId: matchingEvent?.sceneId,
-      sourceLoopId: loop.loopId,
-      category: loop.type as RevealEntry["category"],
-      subject: loop.description,
-      revealedTruth,
-      revealStrength,
-      knownByReader: true,
-      knownByCharacters: matchingEvent?.actors ?? loop.relatedEntities,
-      evidenceRefs: sceneNumber !== null ? [`scene-${sceneNumber}`] : loop.evidenceRefs,
-    } satisfies RevealEntry);
-  }
-
-  return { entries };
-}
-
 function buildRelationshipId(left: string, right: string): string {
   return [left, right].sort((a, b) => a.localeCompare(b, "zh-Hans-CN")).join("::");
 }
@@ -739,6 +535,7 @@ function findRelationshipEvidenceRefs(
 function buildRelationships(
   input: SettlementInput,
   sceneEvidenceMap: ReadonlyMap<number, string>,
+  sceneDeltas: ReadonlyArray<SceneStateDelta>,
 ): RelationshipLedger {
   const knownNames = uniqueStrings([
     ...input.analysis.characterStates
@@ -750,28 +547,42 @@ function buildRelationships(
     (input.previousRelationships?.entries ?? []).map((entry) => [entry.relationshipId, entry] as const),
   );
 
-  for (const state of input.analysis.characterStates.filter((entry) => entry.presentInChapter)) {
-    for (const shift of state.relationshipShift) {
-      const targets = knownNames.filter((name) => name !== state.name && shift.includes(name));
-      for (const target of targets) {
-        const characters = [state.name, target].sort((a, b) => a.localeCompare(b, "zh-Hans-CN")) as [string, string];
-        const relationshipId = buildRelationshipId(characters[0], characters[1]);
-        const normalizedChange = trimSentence(normalizeLedgerPhrase(shift), 72);
-        const previousEntry = nextEntries.get(relationshipId);
-        const polarity = inferRelationshipPolarity(shift);
-        const tension = inferRelationshipTension(shift, polarity);
-        const evidenceRefs = findRelationshipEvidenceRefs(state.name, target, sceneEvidenceMap);
+  for (const sceneDelta of sceneDeltas) {
+    const relationshipShifts = uniqueStrings([
+      ...sceneDelta.outputState.relationshipShifts,
+      ...input.analysis.characterStates
+        .filter((entry) => entry.presentInChapter && sceneDelta.actors.includes(entry.name))
+        .flatMap((entry) => entry.relationshipShift),
+    ]);
 
-        nextEntries.set(relationshipId, {
-          relationshipId,
-          characters,
-          status: normalizedChange,
-          polarity,
-          tension,
-          lastChange: normalizedChange,
-          lastUpdatedChapter: input.chapterNumber,
-          evidenceRefs: evidenceRefs.length > 0 ? evidenceRefs : (previousEntry?.evidenceRefs ?? []),
-        } satisfies RelationshipLedgerEntry);
+    for (const shift of relationshipShifts) {
+      const participants = uniqueStrings([
+        ...sceneDelta.actors,
+        ...knownNames.filter((name) => shift.includes(name)),
+      ]);
+
+      for (const sourceName of participants) {
+        const targets = participants.filter((name) => name !== sourceName && shift.includes(name));
+        for (const target of targets) {
+          const characters = [sourceName, target].sort((a, b) => a.localeCompare(b, "zh-Hans-CN")) as [string, string];
+          const relationshipId = buildRelationshipId(characters[0], characters[1]);
+          const normalizedChange = trimSentence(normalizeLedgerPhrase(shift), 72);
+          const previousEntry = nextEntries.get(relationshipId);
+          const polarity = inferRelationshipPolarity(shift);
+          const tension = inferRelationshipTension(shift, polarity);
+          const evidenceRefs = findRelationshipEvidenceRefs(sourceName, target, sceneEvidenceMap);
+
+          nextEntries.set(relationshipId, {
+            relationshipId,
+            characters,
+            status: normalizedChange,
+            polarity,
+            tension,
+            lastChange: normalizedChange,
+            lastUpdatedChapter: input.chapterNumber,
+            evidenceRefs: evidenceRefs.length > 0 ? evidenceRefs : (previousEntry?.evidenceRefs ?? [`scene-${sceneDelta.sceneNumber}`]),
+          } satisfies RelationshipLedgerEntry);
+        }
       }
     }
   }
@@ -783,12 +594,98 @@ function buildRelationships(
   };
 }
 
+function knownNamesInText(text: string, names: ReadonlyArray<string>): boolean {
+  return names.some((name) => text.includes(name));
+}
+
+function buildSceneOutputState(
+  input: SettlementInput,
+  scene: ChapterAnalysisBundle["scenes"][number],
+  planScene: SceneBlueprintItem | undefined,
+  event: ChronologyEvent,
+  evidence: string,
+): SceneOutputState {
+  const sceneKeywords = buildSceneKeywords(scene, planScene);
+  const relevantCharacterStates = input.analysis.characterStates
+    .filter((entry) => entry.presentInChapter)
+    .filter((entry) => event.actors.includes(entry.name) || evidence.includes(entry.name));
+  const matchingReaderRisks = input.analysis.readerReport.risks.filter((risk) => (
+    event.actors.some((actor) => risk.includes(actor))
+    || sceneKeywords.some((keyword) => keyword.length >= 2 && risk.includes(keyword))
+  ));
+
+  const characterStateShifts = uniqueStrings([
+    ...relevantCharacterStates.map((entry) => `${entry.name}: ${entry.arcProgress}`),
+    ...relevantCharacterStates
+      .filter((entry) => entry.recentDecision.length > 0)
+      .map((entry) => `${entry.name}: ${entry.recentDecision}`),
+    ...relevantCharacterStates
+      .filter((entry) => entry.decisionCost.length > 0)
+      .map((entry) => `${entry.name}: ${entry.decisionCost}`),
+  ]).map((entry) => trimSentence(normalizeLedgerPhrase(entry), 72)).slice(0, 4);
+
+  const carryForwardPressures = uniqueStrings([
+    planScene?.cost ?? "",
+    ...(planScene?.newInformation ?? []),
+    ...matchingReaderRisks,
+    ...relevantCharacterStates.map((entry) => entry.decisionCost),
+    OPEN_LOOP_SIGNAL.test(event.consequence) ? event.consequence : "",
+  ])
+    .filter((entry) => OPEN_LOOP_SIGNAL.test(entry) || /记恨|断供|危险|报复|安排|停发|深井|打压/u.test(entry))
+    .map((entry) => trimSentence(normalizeLedgerPhrase(entry), 72))
+    .slice(0, 3);
+
+  const relationshipShifts = uniqueStrings([
+    planScene?.relationshipChange ?? "",
+    ...relevantCharacterStates.flatMap((entry) => entry.relationshipShift),
+  ])
+    .filter((entry) => event.actors.some((actor) => entry.includes(actor)) || knownNamesInText(entry, event.actors))
+    .map((entry) => trimSentence(normalizeLedgerPhrase(entry), 72))
+    .slice(0, 3);
+
+  const revealSignals = uniqueStrings([
+    ...splitIntoSentences(evidence).filter((sentence) => REVEAL_SIGNAL.test(sentence)),
+    ...(planScene?.newInformation ?? []).filter((entry) => REVEAL_SIGNAL.test(entry)),
+    REVEAL_SIGNAL.test(event.summary) ? event.summary : "",
+    REVEAL_SIGNAL.test(event.consequence) ? event.consequence : "",
+  ]).map((entry) => trimSentence(normalizeLedgerPhrase(entry), 72)).slice(0, 2);
+
+  return {
+    immediateOutcome: trimSentence(event.consequence, 72),
+    characterStateShifts,
+    carryForwardPressures,
+    relationshipShifts,
+    revealSignals,
+    thematicMovement: trimSentence(
+      normalizeLedgerPhrase(planScene?.thematicTension ?? input.plan.themeIntent ?? event.consequence),
+      72,
+    ),
+  };
+}
+
 function buildRawSceneDeltas(
   input: SettlementInput,
   chronologyInsertions: ReadonlyArray<ChronologyEvent>,
+  sceneEvidenceMap: ReadonlyMap<number, string>,
 ): ReadonlyArray<SceneStateDelta> {
   return chronologyInsertions.map((event) => {
-    const planScene = input.plan.sceneBlueprint.find((scene) => scene.sceneNumber === event.sceneNumber);
+    const scene = input.analysis.scenes.find((entry) => entry.sceneNumber === event.sceneNumber) ?? {
+      sceneId: event.sceneId ?? `scene-${event.sceneNumber ?? 0}`,
+      sceneAnchor: `scene-${event.sceneNumber ?? 0}`,
+      sceneNumber: event.sceneNumber ?? 0,
+      pov: event.actors[0] ?? input.plan.sceneBlueprint[0]?.pov ?? "叙事视角",
+      goal: event.summary,
+      conflict: event.summary,
+      turn: event.summary,
+      result: event.consequence,
+      newInformation: [],
+      emotionalShift: "",
+      sourceParagraphs: [event.summary, event.consequence],
+    } satisfies ChapterAnalysisBundle["scenes"][number];
+    const planScene = input.plan.sceneBlueprint.find((entry) => entry.sceneNumber === event.sceneNumber);
+    const evidence = sceneEvidenceMap.get(event.sceneNumber ?? 0) ?? scene.sourceParagraphs.join("\n");
+    const outputState = buildSceneOutputState(input, scene, planScene, event, evidence);
+
     return {
       sceneNumber: event.sceneNumber ?? 0,
       sceneId: event.sceneId,
@@ -798,14 +695,17 @@ function buildRawSceneDeltas(
       consequence: event.consequence,
       stateHighlights: uniqueStrings([
         `${event.summary} -> ${event.consequence}`,
-        planScene?.decision ? `决策：${planScene.decision}` : "",
-        planScene?.cost ? `代价：${planScene.cost}` : "",
-        planScene?.relationshipChange ? `关系：${planScene.relationshipChange}` : "",
-      ]).slice(0, 4),
+        ...outputState.characterStateShifts,
+        ...outputState.carryForwardPressures,
+        ...outputState.relationshipShifts,
+        ...outputState.revealSignals,
+        outputState.thematicMovement,
+      ]).slice(0, 6),
       loopIds: [],
       revealIds: [],
       relationshipIds: [],
-      themeBeat: trimSentence(planScene?.thematicTension ?? input.plan.themeIntent, 72),
+      themeBeat: outputState.thematicMovement,
+      outputState,
     } satisfies SceneStateDelta;
   });
 }
@@ -842,8 +742,232 @@ function chronologyFromSceneDeltas(sceneDeltas: ReadonlyArray<SceneStateDelta>, 
     sceneId: sceneDelta.sceneId,
     actors: sceneDelta.actors,
     summary: sceneDelta.summary,
-    consequence: sceneDelta.consequence,
+    consequence: sceneDelta.outputState.immediateOutcome || sceneDelta.consequence,
   }));
+}
+
+function collectLoopSources(
+  input: SettlementInput,
+  chronologyInsertions: ReadonlyArray<ChronologyEvent>,
+  sceneDeltas: ReadonlyArray<SceneStateDelta>,
+): ReadonlyArray<string> {
+  const draftSentences = splitIntoSentences(input.draft.content).filter((sentence) => !/^["“”'']/.test(sentence));
+  const chronologyConsequences = chronologyInsertions.map((event) => event.consequence);
+  const scenePressures = sceneDeltas.flatMap((sceneDelta) => sceneDelta.outputState.carryForwardPressures);
+  const characterCosts = input.analysis.characterStates
+    .filter((state) => state.presentInChapter)
+    .map((state) => state.decisionCost);
+  const planCosts = input.plan.sceneBlueprint.flatMap((scene) => [
+    scene.cost,
+    ...scene.newInformation,
+    OPEN_LOOP_SIGNAL.test(scene.result) ? scene.result : "",
+  ]);
+
+  const characterNames = input.analysis.characterStates.map((state) => state.name);
+
+  const ranked = uniqueStrings([
+    ...scenePressures,
+    ...input.analysis.readerReport.risks,
+    ...characterCosts,
+    ...planCosts,
+    ...chronologyConsequences,
+    ...draftSentences.filter((sentence) => OPEN_LOOP_SIGNAL.test(sentence)),
+  ])
+    .filter((text) => OPEN_LOOP_SIGNAL.test(text))
+    .filter((text) => !/当前悬念|场景结束时获得有限推进|场景以内压推进|场景中段出现逆转/u.test(text))
+    .filter((text) => !/一旦决定落地/u.test(text))
+    .filter((text) => !META_NARRATIVE_SIGNAL.test(text))
+    .map((text) => {
+      let score = 0;
+      if (/璁版仺|鏂緵|鎶ュ|鍗遍櫓|瀹夋帓|鐪熺浉|绉樺瘑/u.test(text)) score += 4;
+      if (/后续|以后|下月|下一章|会/u.test(text)) score += 3;
+      if (characterNames.some((name) => text.includes(name))) score += 2;
+      if (scenePressures.includes(text)) score += 4;
+      if (/鍋忓府鏈夎儗鏅殑寮熷瓙/u.test(text)) score -= 5;
+      if (/鍙鍙嶆姉/u.test(text)) score -= 2;
+      if (text.length >= 12 && text.length <= 72) score += 2;
+      return { text, score };
+    })
+    .sort((left, right) => right.score - left.score)
+    .reduce<Array<{ text: string; keywords: ReadonlyArray<string> }>>((selected, item) => {
+      if (selected.length >= 2) {
+        return selected;
+      }
+
+      const keywords = extractKeywords(item.text);
+      if (/鍋忓府鏈夎儗鏅殑寮熷瓙/u.test(item.text) && selected.length >= 1) {
+        return selected;
+      }
+      const overlapsExisting = selected.some((existing) => {
+        const overlap = keywords.filter((keyword) => existing.keywords.includes(keyword)).length;
+        return overlap >= Math.min(2, keywords.length) && overlap > 0;
+      });
+      if (overlapsExisting) {
+        return selected;
+      }
+
+      selected.push({ text: item.text, keywords });
+      return selected;
+    }, [])
+    .map((item) => item.text);
+
+  return ranked;
+}
+
+function createNewLoopCandidates(
+  input: SettlementInput,
+  existingLoops: ReadonlyArray<OpenLoopEntry>,
+  chronologyInsertions: ReadonlyArray<ChronologyEvent>,
+  sceneDeltas: ReadonlyArray<SceneStateDelta>,
+): ReadonlyArray<OpenLoopEntry> {
+  const sources = collectLoopSources(input, chronologyInsertions, sceneDeltas).filter((source, index, all) => (
+    !all.some((other, otherIndex) => otherIndex !== index && other.includes(source))
+  ));
+  const existingDescriptions = existingLoops.map((loop) => loop.description);
+  const nextIndexBase = existingLoops.filter((loop) => loop.introducedInChapter === input.chapterNumber).length;
+
+  return sources
+    .filter((source) => !existingDescriptions.some((description) => description.includes(source) || source.includes(description)))
+    .map((source, index) => {
+      const sourceSceneDelta = sceneDeltas.find((sceneDelta) => (
+        sceneDelta.outputState.carryForwardPressures.some((pressure) => pressure.includes(source) || source.includes(pressure))
+      ));
+      const relatedEntities = uniqueStrings(
+        input.analysis.characterStates
+          .filter((character) => source.includes(character.name) || sourceSceneDelta?.actors.includes(character.name))
+          .map((character) => character.name),
+      );
+      const sourceKeywords = extractKeywords(source);
+      const matchingEvent = chronologyInsertions
+        .map((event) => {
+          let score = 0;
+          if (event.summary.includes(source) || source.includes(event.summary)) score += 5;
+          if (event.consequence.includes(source) || source.includes(event.consequence)) score += 5;
+          if (sourceSceneDelta && sourceSceneDelta.sceneNumber === event.sceneNumber) score += 6;
+          score += relatedEntities.filter((entity) => event.actors.includes(entity)).length;
+          score += sourceKeywords.filter((keyword) => (
+            event.summary.includes(keyword) || event.consequence.includes(keyword)
+          )).length;
+          return { event, score };
+        })
+        .sort((left, right) => right.score - left.score)[0]?.event;
+      const owner = relatedEntities[0] ?? matchingEvent?.actors[0] ?? input.analysis.scenes[0]?.pov ?? "章节系统";
+
+      return {
+        loopId: `loop-ch${String(input.chapterNumber).padStart(4, "0")}-${String(nextIndexBase + index + 1).padStart(2, "0")}`,
+        type: pickLoopType(source),
+        introducedInChapter: input.chapterNumber,
+        owner,
+        description: compactLedgerSentence(source, sourceKeywords, relatedEntities, "consequence"),
+        expectedPayoffWindow: pickUrgency(source) === "high" ? "soon" : "mid",
+        urgency: pickUrgency(source),
+        status: "open",
+        payoffConstraints: [
+          "后续章节必须继续承接这条未兑现事项",
+        ],
+        relatedEntities,
+        evidenceRefs: matchingEvent ? [`scene-${matchingEvent.sceneNumber}`] : input.analysis.scenes.map((scene) => `scene-${scene.sceneNumber}`),
+        lastUpdatedChapter: input.chapterNumber,
+      } satisfies OpenLoopEntry;
+    });
+}
+
+function inferRevealStrength(text: string, shouldClose: boolean): RevealEntry["revealStrength"] {
+  if (shouldClose || /鍘熸潵|鍏跺疄|缁堜簬鐭ラ亾|缁堜簬鏄庣櫧|璇寸牬|鎻紑/u.test(text)) {
+    return "explicit";
+  }
+  if (/鐪熺浉|绉樺瘑|鏆撮湶|鐪嬬┛/u.test(text)) {
+    return "partial";
+  }
+  return "hinted";
+}
+
+function buildRevealSentence(
+  evidence: string,
+  keywords: ReadonlyArray<string>,
+  entities: ReadonlyArray<string>,
+  fallback: string,
+): string {
+  const candidate = pickBestSentence(evidence, keywords, entities, "consequence");
+  if (candidate && REVEAL_SIGNAL.test(candidate)) {
+    return trimSentence(normalizeLedgerPhrase(candidate), 72);
+  }
+  return trimSentence(normalizeLedgerPhrase(fallback), 72);
+}
+
+function buildReveals(
+  input: SettlementInput,
+  chronologyInsertions: ReadonlyArray<ChronologyEvent>,
+  chapterSignals: string,
+  sceneEvidenceMap: ReadonlyMap<number, string>,
+  loopStatusMap: ReadonlyMap<string, "open" | "advanced" | "closed">,
+  sceneDeltas: ReadonlyArray<SceneStateDelta>,
+): RevealsLedger {
+  const entries: RevealEntry[] = [];
+
+  for (const loop of input.previousOpenLoops.loops) {
+    if (loop.status === "closed") {
+      continue;
+    }
+    if (!["mystery", "question", "promise"].includes(loop.type)) {
+      continue;
+    }
+
+    const loopKeywords = extractKeywords(loop.description);
+    const sceneRevealMatch = sceneDeltas.find((sceneDelta) => (
+      sceneDelta.outputState.revealSignals.some((signal) => (
+        loopKeywords.some((keyword) => signal.includes(keyword))
+        || loop.relatedEntities.some((entity) => signal.includes(entity))
+      ))
+    ));
+    const hasLoopSignal = loopKeywords.some((keyword) => chapterSignals.includes(keyword))
+      || loop.relatedEntities.some((entity) => entity.length > 0 && chapterSignals.includes(entity))
+      || Boolean(sceneRevealMatch);
+    if (!hasLoopSignal || (!REVEAL_SIGNAL.test(chapterSignals) && !sceneRevealMatch)) {
+      continue;
+    }
+
+    const matchingEvent = chronologyInsertions
+      .map((event) => {
+        let score = 0;
+        score += loopKeywords.filter((keyword) => event.summary.includes(keyword) || event.consequence.includes(keyword)).length * 2;
+        score += loop.relatedEntities.filter((entity) => event.actors.includes(entity)).length * 2;
+        if (sceneRevealMatch && event.sceneNumber === sceneRevealMatch.sceneNumber) score += 6;
+        if (REVEAL_SIGNAL.test(event.summary)) score += 3;
+        if (REVEAL_SIGNAL.test(event.consequence)) score += 4;
+        return { event, score };
+      })
+      .sort((left, right) => right.score - left.score)[0]?.event;
+
+    const sceneNumber = sceneRevealMatch?.sceneNumber ?? matchingEvent?.sceneNumber ?? null;
+    const revealSignal = sceneRevealMatch?.outputState.revealSignals[0];
+    const evidence = sceneNumber !== null ? (sceneEvidenceMap.get(sceneNumber) ?? chapterSignals) : chapterSignals;
+    const action = loopStatusMap.get(loop.loopId) ?? loop.status;
+    const revealStrength = inferRevealStrength(revealSignal ?? evidence, action === "closed");
+    const revealedTruth = buildRevealSentence(
+      revealSignal ?? evidence,
+      loopKeywords,
+      loop.relatedEntities,
+      revealSignal ?? matchingEvent?.consequence ?? matchingEvent?.summary ?? loop.description,
+    );
+
+    entries.push({
+      revealId: `reveal-ch${String(input.chapterNumber).padStart(4, "0")}-${String(entries.length + 1).padStart(2, "0")}`,
+      chapterNumber: input.chapterNumber,
+      sceneNumber,
+      sceneId: matchingEvent?.sceneId,
+      sourceLoopId: loop.loopId,
+      category: loop.type as RevealEntry["category"],
+      subject: loop.description,
+      revealedTruth,
+      revealStrength,
+      knownByReader: true,
+      knownByCharacters: matchingEvent?.actors ?? loop.relatedEntities,
+      evidenceRefs: sceneNumber !== null ? [`scene-${sceneNumber}`] : loop.evidenceRefs,
+    } satisfies RevealEntry);
+  }
+
+  return { entries };
 }
 
 function enrichSceneDeltas(
@@ -858,24 +982,35 @@ function enrichSceneDeltas(
   return sceneDeltas.map((sceneDelta) => {
     const sceneRef = `scene-${sceneDelta.sceneNumber}`;
     const planScene = input.plan.sceneBlueprint.find((scene) => scene.sceneNumber === sceneDelta.sceneNumber);
+    const loopIds = loopUpdates
+      .filter((loop) => loop.evidence.includes(sceneRef))
+      .map((loop) => loop.loopId);
+    const revealIds = reveals.entries
+      .filter((entry) => entry.sceneNumber === sceneDelta.sceneNumber)
+      .map((entry) => entry.revealId);
+    const relationshipIds = currentRelationshipEntries
+      .filter((entry) => entry.evidenceRefs.includes(sceneRef))
+      .map((entry) => entry.relationshipId);
+
     return {
       ...sceneDelta,
-      loopIds: loopUpdates
-        .filter((loop) => loop.evidence.includes(sceneRef))
-        .map((loop) => loop.loopId),
-      revealIds: reveals.entries
-        .filter((entry) => entry.sceneNumber === sceneDelta.sceneNumber)
-        .map((entry) => entry.revealId),
-      relationshipIds: currentRelationshipEntries
-        .filter((entry) => entry.evidenceRefs.includes(sceneRef))
-        .map((entry) => entry.relationshipId),
+      loopIds,
+      revealIds,
+      relationshipIds,
       stateHighlights: uniqueStrings([
         ...sceneDelta.stateHighlights,
+        ...sceneDelta.outputState.carryForwardPressures,
+        ...sceneDelta.outputState.relationshipShifts,
+        ...sceneDelta.outputState.revealSignals,
         ...loopUpdates
           .filter((loop) => loop.evidence.includes(sceneRef))
           .map((loop) => `${loop.action}:${loop.description}`),
-      ]).slice(0, 5),
-      themeBeat: trimSentence(planScene?.thematicTension ?? sceneDelta.themeBeat, 72),
+      ]).slice(0, 6),
+      themeBeat: trimSentence(planScene?.thematicTension ?? sceneDelta.outputState.thematicMovement, 72),
+      outputState: {
+        ...sceneDelta.outputState,
+        thematicMovement: trimSentence(planScene?.thematicTension ?? sceneDelta.outputState.thematicMovement, 72),
+      },
     } satisfies SceneStateDelta;
   });
 }
@@ -912,13 +1047,14 @@ function buildThemeProgressionEntry(
   const primaryTheme = activeTheme?.theme ?? input.plan.sceneBlueprint[0]?.valuePositionA ?? "反抗有代价";
   const antiTheme = activeTheme?.antiTheme ?? input.plan.sceneBlueprint[0]?.valuePositionB ?? "力量可以无损获得";
   const thematicQuestion = input.plan.thematicQuestion;
-  const movementSummary = trimSentence(
-    activeTheme?.interpretation
-      ?? `${primaryTheme} 在本章通过 ${sceneDeltas.slice(0, 2).map((sceneDelta) => sceneDelta.summary).join("；")} 被继续推进。`,
-    96,
-  );
+  const foldedMovement = uniqueStrings(
+    sceneDeltas.map((sceneDelta) => sceneDelta.outputState.thematicMovement).filter((entry) => entry.length > 0),
+  ).slice(0, 2);
+  const movementSummarySource = activeTheme?.interpretation || foldedMovement.join("；") || `${primaryTheme} 在本章被继续推进。`;
+  const movementSummary = trimSentence(movementSummarySource, 96);
   const pressurePoint = trimSentence(
-    input.plan.sceneBlueprint.at(-1)?.thematicTension
+    sceneDeltas.at(-1)?.outputState.thematicMovement
+      ?? input.plan.sceneBlueprint.at(-1)?.thematicTension
       ?? input.plan.themeIntent
       ?? movementSummary,
     72,
@@ -959,7 +1095,7 @@ export class SettlementAgent {
     const sceneEvidenceMap = buildSceneEvidenceMap(input);
     const currentChronologyInsertions = buildChronologyInsertions(input, sceneEvidenceMap);
     const mergedSceneDeltas = mergeSceneDeltas(
-      buildRawSceneDeltas(input, currentChronologyInsertions),
+      buildRawSceneDeltas(input, currentChronologyInsertions, sceneEvidenceMap),
       input.previousChapterStateDelta,
       input.rewrittenSceneNumbers,
     );
@@ -991,7 +1127,7 @@ export class SettlementAgent {
       } satisfies OpenLoopEntry;
     });
 
-    const newLoops = createNewLoopCandidates(input, updatedExistingLoops, chronologyInsertions);
+    const newLoops = createNewLoopCandidates(input, updatedExistingLoops, chronologyInsertions, mergedSceneDeltas);
     loopUpdates.push(
       ...newLoops.map((loop) => ({
         loopId: loop.loopId,
@@ -1005,8 +1141,8 @@ export class SettlementAgent {
       loops: [...updatedExistingLoops, ...newLoops],
     };
     const loopStatusMap = new Map(nextOpenLoops.loops.map((loop) => [loop.loopId, loop.status] as const));
-    const reveals = buildReveals(input, chronologyInsertions, chapterSignals, sceneEvidenceMap, loopStatusMap);
-    const relationships = buildRelationships(input, sceneEvidenceMap);
+    const reveals = buildReveals(input, chronologyInsertions, chapterSignals, sceneEvidenceMap, loopStatusMap, mergedSceneDeltas);
+    const relationships = buildRelationships(input, sceneEvidenceMap, mergedSceneDeltas);
     const sceneDeltas = enrichSceneDeltas(input, mergedSceneDeltas, loopUpdates, reveals, relationships);
     const themeShift = buildThemeProgressionEntry(input, sceneDeltas);
     const nextThemeProgression: ThemeProgressionLedger = {
@@ -1070,3 +1206,5 @@ export class SettlementAgent {
     };
   }
 }
+
+

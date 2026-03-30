@@ -17,6 +17,7 @@
 - Phase 4 Re-settlement 初版：每一轮 revise 之后都会重新执行 settlement 与 continuity audit，canonical persist 只认改后账本
   - 当前 re-settlement 已按“目标章节之前的 canonical 基线”重建，不会把本章旧账再叠一遍
   - 已接入 scene 级增量重结算：未改 scene 优先复用上一版 `sceneDeltas`，改动 scene 重新结算
+  - 已接入初版 scene output-state fold：chapter 级 chronology / open loops / reveals / relationships / theme progression 会优先折叠 scene 输出状态
   - 已接入 `theme progression` 账本，并进入 `context-pack -> plan-next`
 
 当前中短期关注的是“单章质量闭环”，但项目已经正式记录了下一条升级路线：
@@ -111,6 +112,7 @@ STORYLAB_OPENAI_BASE_URL=https://your-compatible-endpoint/v1
   - `books/<bookId>/story/plot/open-loops.json`
   - `books/<bookId>/story/plot/reveals-ledger.json`
   - `books/<bookId>/story/characters/relationship-ledger.json`
+  - `books/<bookId>/story/themes/theme-progression.json`
 
 - state-driven planning 上下文
   - 在 `plan-next` 时先生成

@@ -128,6 +128,9 @@ test("settlement agent produces summary, state delta, chronology, open loops, an
   assert.equal(result.chronology.events.length, 1);
   assert.ok(result.openLoops.loops.length >= 1);
   assert.equal(result.chapterStateDelta.sceneDeltas?.length, 1);
+  assert.ok(result.chapterStateDelta.sceneDeltas?.[0].outputState.carryForwardPressures.length);
+  assert.ok(result.chapterStateDelta.sceneDeltas?.[0].outputState.characterStateShifts.length);
+  assert.ok(result.chapterStateDelta.sceneDeltas?.[0].outputState.thematicMovement.length > 0);
   assert.equal(result.themeProgression.entries.length, 1);
   assert.equal(result.chapterStateDelta.themeShift?.chapterNumber, 1);
   assert.ok(result.relationships.entries.some((entry) => entry.characters.includes("林凡")));
@@ -681,6 +684,14 @@ test("settlement agent reuses unchanged scene deltas and appends theme progressi
           revealIds: [],
           relationshipIds: [],
           themeBeat: "旧版 theme beat",
+          outputState: {
+            immediateOutcome: "旧版 scene 1 consequence",
+            characterStateShifts: ["林凡: 旧版 arc"],
+            carryForwardPressures: ["旧版 pressure 1"],
+            relationshipShifts: ["林凡与赵执事旧版对立"],
+            revealSignals: [],
+            thematicMovement: "旧版 theme beat",
+          },
         },
         {
           sceneNumber: 2,
@@ -694,6 +705,14 @@ test("settlement agent reuses unchanged scene deltas and appends theme progressi
           revealIds: [],
           relationshipIds: [],
           themeBeat: "旧版 theme beat 2",
+          outputState: {
+            immediateOutcome: "旧版 scene 2 consequence",
+            characterStateShifts: ["林凡: 旧版 pressure"],
+            carryForwardPressures: ["旧版 pressure 2"],
+            relationshipShifts: [],
+            revealSignals: [],
+            thematicMovement: "旧版 theme beat 2",
+          },
         },
       ],
       chronologyInsertions: [],
@@ -717,7 +736,9 @@ test("settlement agent reuses unchanged scene deltas and appends theme progressi
 
   assert.equal(result.chapterStateDelta.sceneDeltas?.length, 2);
   assert.equal(result.chapterStateDelta.sceneDeltas?.[0].summary, "旧版 scene 1 summary");
+  assert.equal(result.chapterStateDelta.sceneDeltas?.[0].outputState.immediateOutcome, "旧版 scene 1 consequence");
   assert.notEqual(result.chapterStateDelta.sceneDeltas?.[1].summary, "旧版 scene 2 summary");
+  assert.ok(result.chapterStateDelta.sceneDeltas?.[1].outputState.carryForwardPressures.length > 0);
   assert.equal(result.themeProgression.entries.length, 2);
   assert.equal(result.themeProgression.entries[1].chapterNumber, 2);
   assert.equal(result.chapterStateDelta.themeShift?.chapterNumber, 2);

@@ -281,6 +281,15 @@ export interface ThemeProgressionLedger {
   readonly entries: ReadonlyArray<ThemeProgressionEntry>;
 }
 
+export interface SceneOutputState {
+  readonly immediateOutcome: string;
+  readonly characterStateShifts: ReadonlyArray<string>;
+  readonly carryForwardPressures: ReadonlyArray<string>;
+  readonly relationshipShifts: ReadonlyArray<string>;
+  readonly revealSignals: ReadonlyArray<string>;
+  readonly thematicMovement: string;
+}
+
 export interface SceneStateDelta {
   readonly sceneNumber: number;
   readonly sceneId?: string;
@@ -293,6 +302,7 @@ export interface SceneStateDelta {
   readonly revealIds: ReadonlyArray<string>;
   readonly relationshipIds: ReadonlyArray<string>;
   readonly themeBeat: string;
+  readonly outputState: SceneOutputState;
 }
 
 export interface ChapterStateDelta {
